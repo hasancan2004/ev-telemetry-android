@@ -1,7 +1,5 @@
 package com.hasancankula.evtelemetry.presentation
 
-
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -16,35 +14,28 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelemetryScreen(viewModel: TelemetryViewModel) {
-    // Arka plandan gelen canlı veri nehrini dinliyoruz
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Scaffold: Bize üst bar (TopAppBar) ve modern bir iskelet sağlar
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        text = "EV Dashboard",
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text(text = "EV Dashboard", fontWeight = FontWeight.Bold)
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary, // Barın arka plan rengi
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary // Yazı rengi
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
     ) { paddingValues ->
-        // Ekranın geri kalanı. Scaffold'un bar için ayırdığı boşluğu (paddingValues) buraya veriyoruz
         Surface(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            color = MaterialTheme.colorScheme.surfaceVariant // Hafif gri/farklı bir arka plan tonu
+            color = MaterialTheme.colorScheme.surfaceVariant
         ) {
             when (val state = uiState) {
-
                 is TelemetryUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -64,7 +55,6 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                 is TelemetryUiState.Success -> {
                     val telemetry = state.telemetry
 
-                    // Verileri alt alta, aralarında boşluk olacak şekilde (spacedBy) diziyoruz
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -72,14 +62,12 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Ana Hız Kartı (Daha büyük fontla)
                         TelemetryCard(
                             title = "Anlık Hız",
                             value = "${telemetry.speedKmh} km/h",
                             valueStyle = MaterialTheme.typography.displayMedium
                         )
 
-                        // Diğer Telemetri Kartları
                         TelemetryCard(
                             title = "Batarya Seviyesi",
                             value = "%${telemetry.batteryLevelPct}"
@@ -95,9 +83,14 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                             value = telemetry.suspensionMode
                         )
 
-                        TelemetryCard(
-                            title = "Rejenerasyon & Lastik",
-                            value = "${telemetry.regenerationKw} kW  |  ${telemetry.tirePressurePsi} PSI"
+                        // ========================================================
+                        // YENİ EKLENEN KISIM: Uzaktan Kumanda Panelimiz
+                        // ========================================================
+                        ControlPanelCard(
+                            onModeSelected = { secilenMod ->
+                                // Tıklanan butonun adını ViewModel'e fırlatıyoruz
+                                viewModel.setSuspensionMode(secilenMod)
+                            }
                         )
                     }
                 }
@@ -106,7 +99,56 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
     }
 }
 
-// Kod tekrarını önlemek ve tasarımı tek yerden yönetmek için kendi "Kart" bileşenimizi oluşturduk
+// Süspansiyon kontrol butonlarını barındıran yepyeni kart tasarımımız
+@Composable
+fun ControlPanelCard(onModeSelected: (String) -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Araç Kontrol Paneli",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Yan yana 3 şık buton diziyoruz
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(onClick = { onModeSelected("Sport") }) {
+                    Text("Sport")
+                }
+
+                Button(onClick = { onModeSelected("Comfort") }) {
+                    Text("Comfort")
+                }
+
+                Button(onClick = { onModeSelected("Eco") }) {
+                    Text("Eco")
+                }
+            }
+        }
+    }
+}
+
+// Eski TelemetryCard fonksiyonumuz aynı şekilde duruyor
 @Composable
 fun TelemetryCard(
     title: String,
@@ -115,8 +157,8 @@ fun TelemetryCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp), // Köşeleri yumuşatıyoruz
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp), // Karta gölge (derinlik) veriyoruz
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
