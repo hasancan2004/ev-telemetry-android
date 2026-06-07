@@ -1,96 +1,143 @@
 package com.hasancankula.evtelemetry.presentation
 
-import android.R
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.isPopupLayout
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelemetryScreen(viewModel: TelemetryViewModel) {
-    // Arka planda akan veri nehrini (StateFlow), Compose'un anlayacağı ve
-    // her değiştiğinde ekranı baştan çizeceği bir State'e (Durum) dönüştürüp dinliyoruz.
+    // Arka plandan gelen canlı veri nehrini dinliyoruz
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Ekranın genel tasarımı (Tam ekran yapıp, arka plan rengini veriyoruz)
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        // uiState'in o anki durumuna göre Kotlin'in harika 'when' yapısıyla ekranı çiziyoruz
-        when (val state = uiState) {
-
-            // 1. DURUM: Veri henüz gelmediyse veya bağlanmaya çalışıyorsa
-            TelemetryUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator() // Dönen yükleme çarkı
-                }
-            }
-
-            // 2. DURUM: Python sunucusu kapalıysa veya bağlantı koptuysa
-            is TelemetryUiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    // Scaffold: Bize üst bar (TopAppBar) ve modern bir iskelet sağlar
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
                     Text(
-                        text = "Bağlantı Hatası:\n${state.message}",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.titleMedium
+                        text = "EV Dashboard",
+                        fontWeight = FontWeight.Bold
                     )
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary, // Barın arka plan rengi
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary // Yazı rengi
+                )
+            )
+        }
+    ) { paddingValues ->
+        // Ekranın geri kalanı. Scaffold'un bar için ayırdığı boşluğu (paddingValues) buraya veriyoruz
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            color = MaterialTheme.colorScheme.surfaceVariant // Hafif gri/farklı bir arka plan tonu
+        ) {
+            when (val state = uiState) {
+
+                is TelemetryUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
                 }
-            }
 
-            // 3. DURUM: Veri başarıyla şelaleden akıyorsa (Şov kısmı)
-            is TelemetryUiState.Success -> {
-                val telemetry = state.telemetry  // Gelen JSON verimiz
+                is TelemetryUiState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Bağlantı Hatası:\n${state.message}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
 
-                // Verileri alt alta ve ekranın tam ortasına hizalayarak diziyoruz
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "EV Telemetry Canlı İzleme",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                is TelemetryUiState.Success -> {
+                    val telemetry = state.telemetry
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    // Verileri alt alta, aralarında boşluk olacak şekilde (spacedBy) diziyoruz
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Ana Hız Kartı (Daha büyük fontla)
+                        TelemetryCard(
+                            title = "Anlık Hız",
+                            value = "${telemetry.speedKmh} km/h",
+                            valueStyle = MaterialTheme.typography.displayMedium
+                        )
 
-                    Text(text = "Hız: ${telemetry.speedKmh} km/h", style = MaterialTheme.typography.displayMedium)
-                    Spacer(modifier = Modifier.height(16.dp))
+                        // Diğer Telemetri Kartları
+                        TelemetryCard(
+                            title = "Batarya Seviyesi",
+                            value = "%${telemetry.batteryLevelPct}"
+                        )
 
-                    Text(text = "Batarya: %${telemetry.batteryLevelPct}", style = MaterialTheme.typography.titleLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
+                        TelemetryCard(
+                            title = "Kabin Sıcaklığı",
+                            value = "${telemetry.cabinTemperatureC} °C"
+                        )
 
-                    Text(text = "Kabin Sıcaklığı: ${telemetry.cabinTemperatureC} °C", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
+                        TelemetryCard(
+                            title = "Süspansiyon Modu",
+                            value = telemetry.suspensionMode
+                        )
 
-                    Text(text = "Süspansiyon: ${telemetry.suspensionMode}", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(text = "Rejenerasyon: ${telemetry.regenerationKw} kW", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(text = "Lastik Basıncı: ${telemetry.tirePressurePsi} PSI", style = MaterialTheme.typography.titleMedium)
+                        TelemetryCard(
+                            title = "Rejenerasyon & Lastik",
+                            value = "${telemetry.regenerationKw} kW  |  ${telemetry.tirePressurePsi} PSI"
+                        )
+                    }
                 }
             }
         }
     }
+}
 
+// Kod tekrarını önlemek ve tasarımı tek yerden yönetmek için kendi "Kart" bileşenimizi oluşturduk
+@Composable
+fun TelemetryCard(
+    title: String,
+    value: String,
+    valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineMedium
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp), // Köşeleri yumuşatıyoruz
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp), // Karta gölge (derinlik) veriyoruz
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = value,
+                style = valueStyle,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
 }
