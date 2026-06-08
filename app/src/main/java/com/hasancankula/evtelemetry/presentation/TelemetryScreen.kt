@@ -10,18 +10,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-// GOOGLE MAPS KÜTÜPHANELERİ
+// GOOGLE MAPS KÜTÜPHANELERİ VE YENİ POLYLINE IMPORTU
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.hasancankula.evtelemetry.data.TelemetryHistoryDto
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,8 +70,9 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                 is TelemetryUiState.Success -> {
                     val telemetry = state.telemetry
                     val range = state.estimatedRange
+                    // YENİ: ViewModel'den geçmiş rotayı alıyoruz
+                    val history = state.routeHistory
 
-                    // verticalScroll ekledik ki ekran aşağıya doğru kaydırılabilsin
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -78,13 +82,12 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
 
-                        // ========================================================
-                        // YENİ EKLENEN KISIM: Canlı Harita Kartı (En üste koyduk ki ilk o görünsün)
-                        // ========================================================
+                        // YENİ: Geçmiş rotayı (history) harita kartımıza gönderiyoruz
                         LiveMapCard(
                             latitude = telemetry.latitude,
                             longitude = telemetry.longitude,
-                            speed = telemetry.speedKmh
+                            speed = telemetry.speedKmh,
+                            routeHistory = history
                         )
 
                         TelemetryCard(
@@ -122,7 +125,6 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                             }
                         )
 
-                        // En alta biraz boşluk bırakalım ki kaydırınca butonlar yapışmasın
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
@@ -132,19 +134,24 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
 }
 
 // ========================================================
-// ÖZEL HARİTA BİLEŞENİMİZ
+// GÜNCELLENEN HARİTA BİLEŞENİMİZ (POLYLINE EKLENDİ)
 // ========================================================
 @Composable
-fun LiveMapCard(latitude: Double, longitude: Double, speed: Int) {
-    // Arabanın güncel koordinatını LatLng nesnesine çeviriyoruz
+fun LiveMapCard(
+    latitude: Double,
+    longitude: Double,
+    speed: Int,
+    routeHistory: List<TelemetryHistoryDto> // YENİ PARAMETRE
+) {
     val carLocation = LatLng(latitude, longitude)
 
-    // Kameranın nereye bakacağını ayarlıyoruz (Zoom seviyesi 15 gayet ideal)
+    // Geçmiş rotadaki (DTO içindeki) noktaları Google Maps'in anladığı LatLng listesine çeviriyoruz
+    val polylinePoints = routeHistory.map { LatLng(it.latitude, it.longitude) }
+
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(carLocation, 15f)
+        position = CameraPosition.fromLatLngZoom(carLocation, 16f) // Biraz daha yaklaştırdık ki çizgi net görünsün
     }
 
-    // Araba hareket ettikçe harita kamerasının arabayı takip etmesini sağlıyoruz
     LaunchedEffect(carLocation) {
         cameraPositionState.animate(CameraUpdateFactory.newLatLng(carLocation))
     }
@@ -152,20 +159,28 @@ fun LiveMapCard(latitude: Double, longitude: Double, speed: Int) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp), // Haritanın ekrandaki yüksekliği
+            .height(300.dp),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        // Google Maps'i çizdiriyoruz
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState
         ) {
-            // Arabayı temsil eden kırmızı pin (işaretçi)
+            // YENİ: Aracın arkasından gelen o havalı mavi rota çizgisi
+            if (polylinePoints.isNotEmpty()) {
+                Polyline(
+                    points = polylinePoints,
+                    color = Color.Blue,
+                    width = 12f // Çizginin kalınlığı
+                )
+            }
+
+            // Aracın güncel konumu
             Marker(
                 state = MarkerState(position = carLocation),
                 title = "Araç Konumu",
-                snippet = "Hız: $speed km/h" // Pine tıklanınca anlık hızı göstersin
+                snippet = "Hız: $speed km/h"
             )
         }
     }
@@ -173,6 +188,7 @@ fun LiveMapCard(latitude: Double, longitude: Double, speed: Int) {
 
 @Composable
 fun ControlPanelCard(onModeSelected: (String) -> Unit) {
+    // ... (Aynı kalıyor)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -202,15 +218,9 @@ fun ControlPanelCard(onModeSelected: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Button(onClick = { onModeSelected("Sport") }) {
-                    Text("Sport")
-                }
-                Button(onClick = { onModeSelected("Comfort") }) {
-                    Text("Comfort")
-                }
-                Button(onClick = { onModeSelected("Eco") }) {
-                    Text("Eco")
-                }
+                Button(onClick = { onModeSelected("Sport") }) { Text("Sport") }
+                Button(onClick = { onModeSelected("Comfort") }) { Text("Comfort") }
+                Button(onClick = { onModeSelected("Eco") }) { Text("Eco") }
             }
         }
     }
@@ -224,6 +234,7 @@ fun TelemetryCard(
     containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surface,
     contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary
 ) {
+    // ... (Aynı kalıyor)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),

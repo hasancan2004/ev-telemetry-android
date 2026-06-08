@@ -5,6 +5,8 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
@@ -59,6 +61,20 @@ class TelemetrySocketService {
             activeSession?.send(Frame.Text(commandJson))
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    suspend fun getTelemetryHistory() : List<TelemetryHistoryDto> {
+        return try {
+            // Son 100 konumu çekiyoruz ki haritada belirgin bir çizgi oluşsun
+            val response = client.get("http://10.0.2.2:8000/api/v1/telemetry/history?limit=100")
+
+            // Gelen cevabı metin olarak alıp bizim DTO listemize dönüştürüyoruz
+            val jsonText = response.bodyAsText()
+            jsonFormatter.decodeFromString<List<TelemetryHistoryDto>>(jsonText)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList() // Hata olursa uygulamanın çökmemesi için boş liste dönüyoruz
         }
     }
 
