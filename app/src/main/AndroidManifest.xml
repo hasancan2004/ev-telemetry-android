@@ -12,6 +12,10 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.EVTelemetry">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value= "AIzaSyCG1i52YP1PXNKm8dXw3geYx5xAd5X0xho"
+            />
         <activity
             android:name=".MainActivity"
             android:exported="true"

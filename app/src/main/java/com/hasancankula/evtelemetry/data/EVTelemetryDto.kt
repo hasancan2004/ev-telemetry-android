@@ -21,5 +21,14 @@ data class EVTelemetryDto(
     val suspensionMode: String,
 
     @SerialName("tire_pressure_psi")
-    val tirePressurePsi: Double
+    val tirePressurePsi: Double,
+
+    // ==========================================
+    // YENİ EKLENEN GPS KOORDİNATLARI
+    // ==========================================
+    @SerialName("latitude")
+    val latitude: Double = 0.0,
+
+    @SerialName("longitude")
+    val longitude: Double = 0.0
 )
