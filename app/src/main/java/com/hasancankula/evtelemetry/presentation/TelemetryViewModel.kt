@@ -4,16 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hasancankula.evtelemetry.data.EVTelemetryDto
 import com.hasancankula.evtelemetry.data.TelemetrySocketService
+import com.hasancankula.evtelemetry.domain.SmartRangeCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
-// Arayüzümüzün (UI) içinde bulunabileceği farklı durumları (State) temsil eder.
+// DİKKAT: Success durumuna 'estimatedRange' adında yeni bir parametre ekledik!
 sealed class TelemetryUiState {
     data object Loading : TelemetryUiState()
-    data class Success(val telemetry: EVTelemetryDto) : TelemetryUiState()
+    data class Success(val telemetry: EVTelemetryDto, val estimatedRange: Int) : TelemetryUiState()
     data class Error(val message: String) : TelemetryUiState()
 }
 
@@ -21,14 +22,13 @@ class TelemetryViewModel : ViewModel() {
 
     private val socketService = TelemetrySocketService()
 
-    // Sadece bu ViewModel'in güncelleyebileceği, dışarıya (ekrana) kapalı State
-    private val _uiState = MutableStateFlow<TelemetryUiState>(TelemetryUiState.Loading)
+    // YENİ: Domain katmanındaki zeki hesaplayıcımızı ViewModel'e çağırıyoruz
+    private val rangeCalculator = SmartRangeCalculator()
 
-    // Compose UI'ın (ekranın) abone olup dinleyeceği, değiştirilemez State
+    private val _uiState = MutableStateFlow<TelemetryUiState>(TelemetryUiState.Loading)
     val uiState: StateFlow<TelemetryUiState> = _uiState.asStateFlow()
 
     init {
-        // ViewModel hafızada oluşturulduğu an dinlemeyi başlat
         startTelemetryStream()
     }
 
@@ -39,26 +39,22 @@ class TelemetryViewModel : ViewModel() {
                     _uiState.value = TelemetryUiState.Error(exception.message ?: "Bağlantı koptu.")
                 }
                 .collect { telemetryData ->
-                    _uiState.value = TelemetryUiState.Success(telemetryData)
+                    // Şelaleden yeni JSON geldiği anda o anki şartlara göre menzili hesaplıyoruz
+                    val dynamicRange = rangeCalculator.calculateDynamicRange(telemetryData)
+
+                    // Hesaplanan bu menzili de UI'a (Ekrana) fırlatıyoruz
+                    _uiState.value = TelemetryUiState.Success(telemetryData, dynamicRange)
                 }
         }
     }
 
-    // ====================================================================
-    // YENİ EKLENEN KISIM: Arayüzden gelen komutu araca gönderen köprü
-    // ====================================================================
     fun setSuspensionMode(mode: String) {
-        // Asenkron (Coroutine) bir işlem olduğu için viewModelScope içinde başlatıyoruz
         viewModelScope.launch {
-            // Python FastAPI'nin beklediği tam JSON formatını String olarak hazırlıyoruz
             val commandJson = """{"suspension_mode": "$mode"}"""
-
-            // Hazırladığımız bu JSON mermisini Data katmanındaki tünele ateşliyoruz
             socketService.sendCommand(commandJson)
         }
     }
 
-    // Uygulama tamamen kapandığında bellek sızıntısını önler
     override fun onCleared() {
         super.onCleared()
         socketService.closeClient()

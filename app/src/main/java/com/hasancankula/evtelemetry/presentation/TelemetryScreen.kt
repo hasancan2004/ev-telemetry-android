@@ -53,7 +53,9 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                 }
 
                 is TelemetryUiState.Success -> {
+                    // ViewModel'den gelen her iki veriyi de alıyoruz
                     val telemetry = state.telemetry
+                    val range = state.estimatedRange
 
                     Column(
                         modifier = Modifier
@@ -66,6 +68,17 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                             title = "Anlık Hız",
                             value = "${telemetry.speedKmh} km/h",
                             valueStyle = MaterialTheme.typography.displayMedium
+                        )
+
+                        // ========================================================
+                        // YENİ EKLENEN KISIM: Akıllı Menzil Kartı
+                        // ========================================================
+                        TelemetryCard(
+                            title = "Tahmini Menzil (AI)",
+                            value = "$range km",
+                            valueStyle = MaterialTheme.typography.headlineLarge,
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer, // Farka dikkat çekmek için farklı renk
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                         )
 
                         TelemetryCard(
@@ -83,12 +96,8 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
                             value = telemetry.suspensionMode
                         )
 
-                        // ========================================================
-                        // YENİ EKLENEN KISIM: Uzaktan Kumanda Panelimiz
-                        // ========================================================
                         ControlPanelCard(
                             onModeSelected = { secilenMod ->
-                                // Tıklanan butonun adını ViewModel'e fırlatıyoruz
                                 viewModel.setSuspensionMode(secilenMod)
                             }
                         )
@@ -99,7 +108,6 @@ fun TelemetryScreen(viewModel: TelemetryViewModel) {
     }
 }
 
-// Süspansiyon kontrol butonlarını barındıran yepyeni kart tasarımımız
 @Composable
 fun ControlPanelCard(onModeSelected: (String) -> Unit) {
     Card(
@@ -127,7 +135,6 @@ fun ControlPanelCard(onModeSelected: (String) -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Yan yana 3 şık buton diziyoruz
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -148,19 +155,21 @@ fun ControlPanelCard(onModeSelected: (String) -> Unit) {
     }
 }
 
-// Eski TelemetryCard fonksiyonumuz aynı şekilde duruyor
+// TelemetryCard'ı renk parametreleri alacak şekilde ufak bir güncellemeyle geliştirdik
 @Composable
 fun TelemetryCard(
     title: String,
     value: String,
-    valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineMedium
+    valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineMedium,
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surface,
+    contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = containerColor
         )
     ) {
         Column(
@@ -172,7 +181,7 @@ fun TelemetryCard(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = contentColor
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
