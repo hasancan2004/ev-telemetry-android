@@ -8,6 +8,10 @@ data class TelemetryHistoryDto(
     @SerialName("id")
     val id: Int = 0,
 
+    // YENİ EKLENDİ
+    @SerialName("vehicle_id")
+    val vehicleId: String,
+
     @SerialName("latitude")
     val latitude: Double,
 

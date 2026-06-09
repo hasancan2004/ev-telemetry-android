@@ -23,13 +23,11 @@ class TelemetrySocketService {
 
     private val jsonFormatter = Json { ignoreUnknownKeys = true }
 
-    // Çift yönlü iletişim için aktif tünelimizi (oturum) hafızada tutuyoruz
     private var activeSession: DefaultClientWebSocketSession? = null
 
-    // 1. YÖN: Araçtan gelen veriyi dinleyen şelalemiz (Aynı kalıyor, sadece session yapısı değişti)
-    fun getTelemetryStream(): Flow<EVTelemetryDto> = flow {
+    // KRİTİK DEĞİŞİKLİK: Artık tek bir EVTelemetryDto değil, List<EVTelemetryDto> dönüyoruz!
+    fun getTelemetryStream(): Flow<List<EVTelemetryDto>> = flow {
         try {
-            // Tüneli açıp aktif oturum değişkenimize kaydediyoruz
             val session = client.webSocketSession(
                 method = HttpMethod.Get,
                 host = "10.0.2.2",
@@ -38,43 +36,38 @@ class TelemetrySocketService {
             )
             activeSession = session
 
-            // incoming.receive() yerine doğrudan kanalın içinde dönerek gelen verileri yakalıyoruz
             for (frame in session.incoming) {
                 if (frame is Frame.Text) {
                     val jsonText = frame.readText()
-                    val telemetryDto = jsonFormatter.decodeFromString<EVTelemetryDto>(jsonText)
-                    emit(telemetryDto)
+                    // Gelen JSON Array'ini LİSTE olarak parse ediyoruz
+                    val fleetData = jsonFormatter.decodeFromString<List<EVTelemetryDto>>(jsonText)
+                    emit(fleetData)
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
-            // Flow iptal olursa veya bağlantı koparsa tüneli boşa çıkarıyoruz
             activeSession = null
         }
     }
 
-    // 2. YÖN: Bizden araca komut gönderen yepyeni fonksiyonumuz
     suspend fun sendCommand(commandJson: String) {
         try {
-            // Eğer aktif bir tünel (session) varsa, içine JSON komutumuzu fırlat
             activeSession?.send(Frame.Text(commandJson))
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    suspend fun getTelemetryHistory() : List<TelemetryHistoryDto> {
+    // YENİ: Geçmişi çekerken artık "Hangi aracın geçmişi?" diye sorabiliyoruz
+    suspend fun getTelemetryHistory(vehicleId: String): List<TelemetryHistoryDto> {
         return try {
-            // Son 100 konumu çekiyoruz ki haritada belirgin bir çizgi oluşsun
-            val response = client.get("http://10.0.2.2:8000/api/v1/telemetry/history?limit=100")
-
-            // Gelen cevabı metin olarak alıp bizim DTO listemize dönüştürüyoruz
+            val response = client.get("http://10.0.2.2:8000/api/v1/telemetry/history?vehicle_id=$vehicleId&limit=100")
             val jsonText = response.bodyAsText()
             jsonFormatter.decodeFromString<List<TelemetryHistoryDto>>(jsonText)
         } catch (e: Exception) {
             e.printStackTrace()
-            emptyList() // Hata olursa uygulamanın çökmemesi için boş liste dönüyoruz
+            emptyList()
         }
     }
 

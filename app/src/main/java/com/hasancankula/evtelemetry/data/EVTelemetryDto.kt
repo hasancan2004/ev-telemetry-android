@@ -5,6 +5,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class EVTelemetryDto(
+    // ==========================================
+    // YENİ: Aracın Kimliği (Plakası)
+    // ==========================================
+    @SerialName("vehicle_id")
+    val vehicleId: String,
+
     @SerialName("speed_kmh")
     val speedKmh: Int,
 
@@ -23,9 +29,6 @@ data class EVTelemetryDto(
     @SerialName("tire_pressure_psi")
     val tirePressurePsi: Double,
 
-    // ==========================================
-    // YENİ EKLENEN GPS KOORDİNATLARI
-    // ==========================================
     @SerialName("latitude")
     val latitude: Double = 0.0,
 
