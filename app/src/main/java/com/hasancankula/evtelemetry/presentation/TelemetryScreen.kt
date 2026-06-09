@@ -25,8 +25,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.android.gms.location.Geofence
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -46,35 +48,72 @@ import com.patrykandpatrick.vico.core.entry.entryModelOf
 @Composable
 fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
     val navController = rememberNavController()
+    val items = listOf(Screen.Fleet, Screen.Geofence, Screen.Settings)
 
-    NavHost(navController = navController, startDestination = "fleet_dashboard") {
+    Scaffold(
+        bottomBar = {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp
+            ) {
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
 
-        // 1. Ekran: Filo Listesi
-        composable("fleet_dashboard") {
-            FleetDashboardScreen(
-                viewModel = viewModel,
-                onVehicleClick = { vehicleId ->
-                    viewModel.selectVehicle(vehicleId) // ViewModel'e hangi aracı seçtiğimizi söyle
-                    navController.navigate("vehicle_detail/$vehicleId") // Detay sayfasına uçur
+                items.forEach { screen ->
+                    NavigationBarItem(
+                        icon = { Icon(screen.icon, contentDescription = screen.title) },
+                        label = { Text(screen.title) },
+                        selected = currentRoute == screen.route,
+                        onClick = {
+                            navController.navigate(screen.route) {
+                                // Ekranlar üst üste binmesin diye geri tuşu ayarı
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    )
                 }
-            )
+            }
         }
+    ) { paddingValues ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Fleet.route,
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            // 1. ANA EKRAN: Filo Listesi
+            composable(Screen.Fleet.route) {
+                FleetDashboardScreen(
+                    viewModel = viewModel,
+                    onVehicleClick = { vehicleId ->
+                        viewModel.selectVehicle(vehicleId)
+                        navController.navigate("vehicle_detail/$vehicleId")
+                    }
+                )
+            }
 
-        // 2. Ekran: Araç Detay & Canlı Harita Takibi
-        composable(
-            route = "vehicle_detail/{vehicleId}",
-            arguments = listOf(navArgument("vehicleId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val vehicleId = backStackEntry.arguments?.getString("vehicleId") ?: ""
+            // 2. YENİ EKRAN: Geofencing (Güvenlik Alanı)
+            composable(Screen.Geofence.route) {
+                GeofenceMapScreen(viewModel = viewModel)
+            }
 
-            VehicleDetailScreen(
-                vehicleId = vehicleId,
-                viewModel = viewModel,
-                onBackClick = {
-                    viewModel.clearSelectedVehicle() // Hafızayı temizle
-                    navController.popBackStack() // Geri dön
-                }
-            )
+            // 3. YENİ EKRAN: Ayarlar
+            composable(Screen.Settings.route) {
+                SettingsScreen()
+            }
+
+            // Detay Ekranı (Alt menüde gözükmez ama içeriden gidilir)
+            composable(
+                route = "vehicle_detail/{vehicleId}",
+                arguments = listOf(navArgument("vehicleId") { type = NavType.StringType })
+            ) {
+                VehicleDetailScreen(
+                    vehicleId = it.arguments?.getString("vehicleId") ?: "",
+                    viewModel = viewModel,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
@@ -356,5 +395,57 @@ fun SpeedAnalyticsCard(routeHistory: List<TelemetryHistoryDto>) {
             }
         }
 
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GeofenceMapScreen(viewModel: TelemetryViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Konya'nın merkez koordinatları (Güvenli Bölge Merkezi)
+    val centerPoint = LatLng(37.8746, 32.4933)
+
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(centerPoint, 10f)
+    }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Güvenlik Bölgeleri", fontWeight = FontWeight.Bold) }) }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding)) {
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState
+            ) {
+                // 1. GÜVENLİ BÖLGE ÇEMBERİ (Kırmızı şeffaf alan)
+                Circle(
+                    center = centerPoint,
+                    radius = 20000.0, // 20 Kilometre yarıçap
+                    fillColor = Color.Red.copy(alpha = 0.2f),
+                    strokeColor = Color.Red,
+                    strokeWidth = 5f
+                )
+
+                // 2. TÜM ARAÇLARIN CANLI KONUMU
+                if (uiState is FleetUiState.Success) {
+                    (uiState as FleetUiState.Success).vehicles.forEach { vehicle ->
+                        Marker(
+                            state = MarkerState(position = LatLng(vehicle.latitude, vehicle.longitude)),
+                            title = vehicle.vehicleId,
+                            snippet = "Hız: ${vehicle.speedKmh} km/h"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Boş Ayarlar Ekranı (Şimdilik)
+@Composable
+fun SettingsScreen() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Ayarlar Paneli Yakında...", style = MaterialTheme.typography.headlineMedium)
     }
 }
