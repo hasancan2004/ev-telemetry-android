@@ -33,6 +33,12 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 import com.hasancankula.evtelemetry.data.EVTelemetryDto
 import com.hasancankula.evtelemetry.data.TelemetryHistoryDto
+import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
+import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
+import com.patrykandpatrick.vico.compose.chart.Chart
+import com.patrykandpatrick.vico.compose.chart.line.lineChart
+import com.patrykandpatrick.vico.core.entry.FloatEntry
+import com.patrykandpatrick.vico.core.entry.entryModelOf
 
 // ========================================================
 // ANA NAVIGASYON MOTORU
@@ -223,6 +229,9 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
                         routeHistory = detailState.routeHistory
                     )
 
+                    // YENİ EKLENEN GRAFİK KARTIMIZ
+                    SpeedAnalyticsCard(routeHistory = detailState.routeHistory)
+
                     // YENİ EKLENEN YAPAY ZEKA KARTI
                     TelemetryCard(
                         title = "Yapay Zeka Arıza Riski",
@@ -289,5 +298,63 @@ fun TelemetryCard(title: String, value: String, valueStyle: androidx.compose.ui.
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = value, style = valueStyle, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+@Composable
+fun SpeedAnalyticsCard(routeHistory: List<TelemetryHistoryDto>) {
+    // 1. DTO listemizdeki verileri, grafiğin anlayacağı X (Zaman) ve Y (Hız) koordinatlarına çeviriyoruz
+    val chartEntries = routeHistory.mapIndexed { index, dto ->
+        FloatEntry(x = index.toFloat(), y = dto.speedKmh.toFloat())
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(250.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Hız Analizi (Son 100 Veri)",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. Eğer yeterli veri varsa grafiği çizdiriyoruz
+            if (chartEntries.size > 1) {
+                val chartEntryModel = entryModelOf(chartEntries)
+
+                Chart(
+                    chart = lineChart(),
+                    model = chartEntryModel,
+                    startAxis = rememberStartAxis(title = "Hız (km/h)"),
+                    bottomAxis = rememberBottomAxis(),
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                    ) {
+                    Text(
+                        "Grafik için veri toplanıyor...",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+            }
+        }
+
     }
 }

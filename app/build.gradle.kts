@@ -82,4 +82,7 @@ dependencies {
 
     // Material Extended İkonları (Geri butonu vb. için)
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Vico Grafik Kütüphanesi (Compose ve Material 3 uyumlu)
+    implementation("com.patrykandpatrick.vico:compose-m3:1.14.0")
 }
