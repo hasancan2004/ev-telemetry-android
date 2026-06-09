@@ -33,5 +33,11 @@ data class EVTelemetryDto(
     val latitude: Double = 0.0,
 
     @SerialName("longitude")
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
+
+    @SerialName("maintenance_risk_pct")
+    val maintenanceRiskPct: Double = 0.0
+
+
+
 )

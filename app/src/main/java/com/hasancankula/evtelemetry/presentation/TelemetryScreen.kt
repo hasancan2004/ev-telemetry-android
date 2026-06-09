@@ -2,6 +2,7 @@ package com.hasancankula.evtelemetry.presentation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -124,6 +125,13 @@ fun FleetDashboardScreen(viewModel: TelemetryViewModel, onVehicleClick: (String)
 @Composable
 fun VehicleFleetCard(vehicle: EVTelemetryDto, onClick: () -> Unit) {
     val isMoving = vehicle.speedKmh > 0
+
+    // AI Riskine göre renk belirliyoruz
+    val riskColor = when {
+        vehicle.maintenanceRiskPct > 75.0 -> Color.Red
+        vehicle.maintenanceRiskPct > 40.0 -> Color(0xFFFFA500) // Turuncu
+        else -> Color(0xFF4CAF50) // Yeşil
+    }
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() }, // Tıklanma özelliği ekledik!
         shape = RoundedCornerShape(16.dp),
@@ -142,6 +150,25 @@ fun VehicleFleetCard(vehicle: EVTelemetryDto, onClick: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(text = "Hız: ${vehicle.speedKmh} km/h")
                 Text(text = "Batarya: %${vehicle.batteryLevelPct}", fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // YENİ: YAPAY ZEKA RİSK GÖSTERGESİ
+            Row(
+                modifier =  Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "AI Arıza Riski:", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    text = "%${vehicle.maintenanceRiskPct}",
+                    fontWeight = FontWeight.Bold,
+                    color = riskColor,
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
     }
@@ -196,6 +223,13 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
                         routeHistory = detailState.routeHistory
                     )
 
+                    // YENİ EKLENEN YAPAY ZEKA KARTI
+                    TelemetryCard(
+                        title = "Yapay Zeka Arıza Riski",
+                        value = "%${telemetry.maintenanceRiskPct}",
+                        containerColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                     TelemetryCard(title = "Anlık Hız", value = "${telemetry.speedKmh} km/h", valueStyle = MaterialTheme.typography.displayMedium)
                     TelemetryCard(title = "Tahmini Menzil (AI)", value = "${detailState.estimatedRange} km", containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
                     TelemetryCard(title = "Batarya Seviyesi", value = "%${telemetry.batteryLevelPct}")
