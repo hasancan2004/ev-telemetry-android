@@ -100,7 +100,7 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
 
             // 3. YENİ EKRAN: Ayarlar
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(viewModel = viewModel)
             }
 
             // Detay Ekranı (Alt menüde gözükmez ama içeriden gidilir)
@@ -442,10 +442,103 @@ fun GeofenceMapScreen(viewModel: TelemetryViewModel) {
     }
 }
 
-// Boş Ayarlar Ekranı (Şimdilik)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Ayarlar Paneli Yakında...", style = MaterialTheme.typography.headlineMedium)
+fun SettingsScreen(viewModel: TelemetryViewModel) {
+    // ViewModel'deki anlık ayar değerlerini dinliyoruz
+    val aiThreshold by viewModel.aiAlarmThreshold.collectAsStateWithLifecycle()
+    val geofenceRadius by viewModel.geofenceRadiusKm.collectAsStateWithLifecycle()
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Filo Kontrol Ayarları", fontWeight = FontWeight.Bold) }) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Bildirim Hassasiyeti",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 1. YAPAY ZEKA ALARM KARTI
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Yapay Zeka Alarm Eşiği", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "%${aiThreshold.toInt()}",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Arıza riski bu seviyeyi aştığında acil durum bildirimi gönderilir.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Slider(
+                        value = aiThreshold,
+                        onValueChange = { viewModel.updateAiThreshold(it) },
+                        valueRange = 50f..95f,
+                        steps = 8 // 50, 55, 60... şeklinde 5'er 5'er atlar
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Coğrafi Sınır (Geofencing)",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 2. GEOFENCE YARIÇAP KARTI
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Güvenli Bölge Çapı", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "${geofenceRadius.toInt()} km",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Araçlar Konya merkezinden bu mesafe kadar uzaklaştığında sınır ihlali sayılır.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Slider(
+                        value = geofenceRadius,
+                        onValueChange = { viewModel.updateGeofenceRadius(it) },
+                        valueRange = 5f..100f,
+                        steps = 18 // 5'ten 100'e 5'er km atlar
+                    )
+                }
+            }
+        }
     }
 }

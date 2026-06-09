@@ -1,15 +1,19 @@
 package com.hasancankula.evtelemetry.presentation
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hasancankula.evtelemetry.data.EVTelemetryDto
+import com.hasancankula.evtelemetry.data.SettingsDataStore
 import com.hasancankula.evtelemetry.data.TelemetryHistoryDto
 import com.hasancankula.evtelemetry.data.TelemetrySocketService
 import com.hasancankula.evtelemetry.domain.SmartRangeCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 sealed class FleetUiState {
@@ -25,15 +29,41 @@ data class VehicleDetailState(
     val routeHistory: List<TelemetryHistoryDto> = emptyList()
 )
 
-class TelemetryViewModel : ViewModel() {
+// 1. Sınıf tanımını AndroidViewModel yapıyoruz ki 'application' (Context) alabilsin
+class TelemetryViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val settingsDataStore = SettingsDataStore(application)
     private val socketService = TelemetrySocketService()
     private val rangeCalculator = SmartRangeCalculator()
+
+    // ==========================================
+    // DİNAMİK AYARLAR (DATASTORE BAĞLANTILI)
+    // ==========================================
+
+    // DataStore'dan gelen canlı veriyi doğrudan StateFlow'a çeviriyoruz
+    val aiAlarmThreshold: StateFlow<Float> = settingsDataStore.aiThresholdFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 75f)
+
+    val geofenceRadiusKm: StateFlow<Float> = settingsDataStore.geofenceRadiusFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 20f)
+
+    // Kaydırıcı (Slider) değiştikçe DataStore'a kaydet
+    fun updateAiThreshold(newValue: Float) {
+        viewModelScope.launch { settingsDataStore.saveAiThreshold(newValue) }
+    }
+
+    fun updateGeofenceRadius(newValue: Float) {
+        viewModelScope.launch { settingsDataStore.saveGeofenceRadius(newValue) }
+    }
+
+    // ==========================================
+    // FİLO VE ARAÇ DURUMU (UI STATE)
+    // ==========================================
 
     private val _uiState = MutableStateFlow<FleetUiState>(FleetUiState.Loading)
     val uiState: StateFlow<FleetUiState> = _uiState.asStateFlow()
 
-    // YENİ: Detay ekranı için izole bir state akışı oluşturduk
+    // Detay ekranı için izole bir state akışı
     private val _detailState = MutableStateFlow(VehicleDetailState())
     val detailState: StateFlow<VehicleDetailState> = _detailState.asStateFlow()
 
@@ -53,13 +83,13 @@ class TelemetryViewModel : ViewModel() {
                 .collect { fleetList ->
                     _uiState.value = FleetUiState.Success(fleetList)
 
-                    // KRİTİK KISIM: Eğer kullanıcı bir aracın detayındaysa, o aracı listeden cımbızla çekip detay ekranını da tetikliyoruz
+                    // KRİTİK KISIM: Eğer kullanıcı bir aracın detayındaysa
                     selectedVehicleId?.let { id ->
                         val activeVehicle = fleetList.find { it.vehicleId == id }
                         activeVehicle?.let { vehicle ->
                             val dynamicRange = rangeCalculator.calculateDynamicRange(vehicle)
 
-                            // Canlı gelen koordinatı, dünkü gibi harita çizgi listemize ekliyoruz
+                            // Canlı gelen koordinatı harita çizgi listemize ekliyoruz
                             val currentPoint = TelemetryHistoryDto(
                                 vehicleId = vehicle.vehicleId,
                                 latitude = vehicle.latitude,
@@ -100,7 +130,7 @@ class TelemetryViewModel : ViewModel() {
         _detailState.value = VehicleDetailState()
     }
 
-    // YENİ: Komut gönderirken artık hangi araca gönderdiğimizi de Python'a söylüyoruz
+    // Komut gönderirken artık hangi araca gönderdiğimizi de Python'a söylüyoruz
     fun setSuspensionMode(vehicleId: String, mode: String) {
         viewModelScope.launch {
             val commandJson = """{"vehicle_id": "$vehicleId", "suspension_mode": "$mode"}"""

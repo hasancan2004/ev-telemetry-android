@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.hasancankula.evtelemetry.data.SettingsDataStore
 import com.hasancankula.evtelemetry.data.TelemetrySocketService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +17,11 @@ import kotlin.math.*
 
 class TelemetryForegroundService : Service() {
 
+    private lateinit var settingsDataStore: SettingsDataStore
+
+    // Dinamik olarak güncellenecek sınırlar
+    private var currentAiThreshold = 75.0
+    private var currentGeofenceRadiusMeters = 20000.0
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private val socketService = TelemetrySocketService()
     private val channelId = "telemetry_alerts_channel"
@@ -32,6 +38,25 @@ class TelemetryForegroundService : Service() {
     private val maxDistanceMeters = 20000.0 // 20 Kilometre sınır
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        settingsDataStore = SettingsDataStore(this) // Servis zaten bir Context'tir
+
+        // 1. Yapay Zeka sınırını sürekli dinle
+        serviceScope.launch {
+            settingsDataStore.aiThresholdFlow.collect { threshold ->
+                currentAiThreshold = threshold.toDouble()
+            }
+        }
+
+        // 2. Geofence sınırını sürekli dinle (KM'yi metreye çevirerek kaydet)
+        serviceScope.launch {
+            settingsDataStore.geofenceRadiusFlow.collect {radiusKm ->
+                currentGeofenceRadiusMeters = radiusKm.toDouble() * 1000.0
+            }
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = NotificationCompat.Builder(this, channelId)
@@ -54,7 +79,7 @@ class TelemetryForegroundService : Service() {
                     fleetList.forEach { vehicle ->
 
                         // 1. KONTROL: YAPAY ZEKA ARIZA RİSKİ (%75)
-                        if (vehicle.maintenanceRiskPct > 75.0) {
+                        if (vehicle.maintenanceRiskPct > currentAiThreshold) {
                             if (!alertedVehicles.contains(vehicle.vehicleId)) {
                                 sendCriticalAlert(vehicle.vehicleId, vehicle.maintenanceRiskPct)
                                 alertedVehicles.add(vehicle.vehicleId)
@@ -68,7 +93,7 @@ class TelemetryForegroundService : Service() {
                         // ========================================================
                         val distance = calculateDistance(vehicle.latitude, vehicle.longitude, centerLat, centerLng)
 
-                        if (distance > maxDistanceMeters) {
+                        if (distance > currentGeofenceRadiusMeters) {
                             // Araç 20 km dışına çıktıysa ve daha önce bildirim atılmadıysa alarm ver!
                             if (!breachedVehicles.contains(vehicle.vehicleId)) {
                                 sendGeofenceAlert(vehicle.vehicleId, distance / 1000.0) // Metreyi KM'ye çevirip yolluyoruz

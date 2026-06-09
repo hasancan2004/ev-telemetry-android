@@ -86,4 +86,7 @@ dependencies {
 
     // Vico Grafik Kütüphanesi (Compose ve Material 3 uyumlu)
     implementation("com.patrykandpatrick.vico:compose-m3:1.14.0")
+
+    // Jetpack DataStore (Ayarları kaydetmek ve dinlemek için)
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 }
