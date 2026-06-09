@@ -46,6 +46,7 @@ class TelemetrySocketService {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            throw e // YENİ EKLENEN SATIR: Hatayı yutma, ViewModel'e fırlat!
         } finally {
             activeSession = null
         }

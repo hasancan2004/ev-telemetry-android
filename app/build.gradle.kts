@@ -76,4 +76,10 @@ dependencies {
     // Google Maps Jetpack Compose Entegrasyonu
     implementation("com.google.maps.android:maps-compose:4.3.3")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
+
+    // Jetpack Compose Navigation Entegrasyonu
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // Material Extended İkonları (Geri butonu vb. için)
+    implementation("androidx.compose.material:material-icons-extended")
 }
