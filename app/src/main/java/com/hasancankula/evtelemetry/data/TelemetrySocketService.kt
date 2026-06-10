@@ -27,9 +27,9 @@ class TelemetrySocketService {
     private var activeSession: DefaultClientWebSocketSession? = null
 
     // Bulut Adresimiz
+    // Sondaki / (slash) silindi
     private val BASE_URL = "https://ev-telemetry-backend-production.up.railway.app"
     private val WS_URL = "wss://ev-telemetry-backend-production.up.railway.app/ws/telemetry"
-
     fun getTelemetryStream(): Flow<List<EVTelemetryDto>> = flow {
         try {
             // Portsuz, wss üzerinden doğrudan bağlantı
