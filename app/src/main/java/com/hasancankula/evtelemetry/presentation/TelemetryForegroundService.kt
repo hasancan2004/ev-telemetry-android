@@ -13,32 +13,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import kotlin.math.*
 
 class TelemetryForegroundService : Service() {
 
     private lateinit var settingsDataStore: SettingsDataStore
 
-    // Dinamik olarak güncellenecek sınırlar
+    // Dinamik olarak güncellenecek AI sınırı
     private var currentAiThreshold = 75.0
-    private var currentGeofenceRadiusMeters = 20000.0
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
     private val socketService = TelemetrySocketService()
     private val channelId = "telemetry_alerts_channel"
 
-    // ========================================================
-    // YENİ: Spam engelleme hafızaları (Araç ID'si ve Son Bildirim Zamanı)
-    // ========================================================
+    // Spam engelleme hafızaları (Araç ID'si ve Son Bildirim Zamanı)
     private val lastAiAlertTime = mutableMapOf<String, Long>()
     private val lastGeofenceAlertTime = mutableMapOf<String, Long>()
 
     // SOĞUMA SÜRESİ: Aynı araca arka arkaya bildirim atmak için geçmesi gereken süre (1 Dakika)
-    // Test ederken çok beklersen burayı 10 * 1000L (10 saniye) yapabilirsin.
     private val COOLDOWN_MS = 60 * 1000L
-
-    // GÜVENLİ BÖLGE PARAMETRELERİ (Konya Merkez)
-    private val centerLat = 37.8746
-    private val centerLng = 32.4933
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -53,19 +44,15 @@ class TelemetryForegroundService : Service() {
             }
         }
 
-        // 2. Geofence sınırını sürekli dinle (KM'yi metreye çevirerek kaydet)
-        serviceScope.launch {
-            settingsDataStore.geofenceRadiusFlow.collect { radiusKm ->
-                currentGeofenceRadiusMeters = radiusKm.toDouble() * 1000.0
-            }
-        }
+        // NOT: Geofence sınırını (Meters) ve CenterLat/Lng değişkenlerini sildik!
+        // Çünkü bu hesaplamanın tamamını artık Python Backend'i yapıyor.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Filo Takip Servisi Aktif")
             .setContentText("Yapay zeka ve Coğrafi Sınır (Geofence) koruması devrede...")
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setSmallIcon(android.R.drawable.ic_dialog_map)
             .build()
 
         startForeground(1, notification)
@@ -79,50 +66,37 @@ class TelemetryForegroundService : Service() {
             socketService.getTelemetryStream()
                 .catch { e -> e.printStackTrace() }
                 .collect { fleetList ->
-                    val currentTime = System.currentTimeMillis() // Anlık zamanı alıyoruz
+                    val currentTime = System.currentTimeMillis()
 
                     fleetList.forEach { vehicle ->
 
+                        // ========================================================
                         // 1. KONTROL: YAPAY ZEKA ARIZA RİSKİ
+                        // ========================================================
                         if (vehicle.maintenanceRiskPct > currentAiThreshold) {
                             val lastAlertTime = lastAiAlertTime[vehicle.vehicleId] ?: 0L
 
-                            // Daha önce bildirim atılmadıysa VEYA üzerinden 1 dakika (COOLDOWN_MS) geçtiyse
                             if (currentTime - lastAlertTime > COOLDOWN_MS) {
                                 sendCriticalAlert(vehicle.vehicleId, vehicle.maintenanceRiskPct)
-                                lastAiAlertTime[vehicle.vehicleId] = currentTime // Zamanı güncelle
+                                lastAiAlertTime[vehicle.vehicleId] = currentTime
                             }
                         }
 
+                        // ========================================================
                         // 2. KONTROL: COĞRAFİ SINIR İHLALİ (GEOFENCING)
-                        val distance = calculateDistance(vehicle.latitude, vehicle.longitude, centerLat, centerLng)
-
-                        if (distance > currentGeofenceRadiusMeters) {
+                        // Backend'den gelen hazır geofenceBreach boolean değerini kullanıyoruz.
+                        // ========================================================
+                        if (vehicle.geofenceBreach) {
                             val lastGeofenceTime = lastGeofenceAlertTime[vehicle.vehicleId] ?: 0L
 
-                            // Daha önce bildirim atılmadıysa VEYA üzerinden 1 dakika (COOLDOWN_MS) geçtiyse
                             if (currentTime - lastGeofenceTime > COOLDOWN_MS) {
-                                sendGeofenceAlert(vehicle.vehicleId, distance / 1000.0) // Metreyi KM'ye çevirip yolluyoruz
-                                lastGeofenceAlertTime[vehicle.vehicleId] = currentTime // Zamanı güncelle
+                                sendGeofenceAlert(vehicle.vehicleId, vehicle.vehicleModel)
+                                lastGeofenceAlertTime[vehicle.vehicleId] = currentTime
                             }
                         }
                     }
                 }
         }
-    }
-
-    // İki koordinat arasındaki kuş uçuşu mesafeyi metre cinsinden ölçen matematiksel fonksiyon (Haversine Formula)
-    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371e3 // Dünyanın yarıçapı (metre)
-        val phi1 = Math.toRadians(lat1)
-        val phi2 = Math.toRadians(lat2)
-        val deltaPhi = Math.toRadians(lat2 - lat1)
-        val deltaLambda = Math.toRadians(lon2 - lon1)
-
-        val a = sin(deltaPhi / 2).pow(2) + cos(phi1) * cos(phi2) * sin(deltaLambda / 2).pow(2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-        return r * c // Metre cinsinden mesafe
     }
 
     private fun sendCriticalAlert(vehicleId: String, risk: Double) {
@@ -139,18 +113,19 @@ class TelemetryForegroundService : Service() {
         notificationManager.notify(vehicleId.hashCode(), alertNotification)
     }
 
-    private fun sendGeofenceAlert(vehicleId: String, distanceKm: Double) {
+    private fun sendGeofenceAlert(vehicleId: String, vehicleModel: String) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val geofenceNotification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("⚠️ BÖLGE İHLALİ ALARMI")
-            .setContentText("$vehicleId merkezden ${String.format("%.1f", distanceKm)} km uzaklaşarak GÜVENLİ ALANI TERK ETTİ!")
+            .setContentText("$vehicleModel ($vehicleId) operasyon bölgesini TERK ETTİ!")
             .setSmallIcon(android.R.drawable.ic_dialog_map)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVibrate(longArrayOf(1000, 1000, 1000)) // Telefonu titret
             .setAutoCancel(true)
             .build()
 
+        // Sınır ihlallerinin ID'sini ayırıyoruz ki aynı aracın hem AI hem sınır bildirimi aynı anda ekranda kalabilsin
         notificationManager.notify((vehicleId + "_geofence").hashCode(), geofenceNotification)
     }
 
