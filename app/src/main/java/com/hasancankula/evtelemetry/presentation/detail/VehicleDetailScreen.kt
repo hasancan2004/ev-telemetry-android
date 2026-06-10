@@ -33,7 +33,6 @@ import com.hasancankula.evtelemetry.R
 import com.hasancankula.evtelemetry.data.ChargingStationDto
 import com.hasancankula.evtelemetry.data.TelemetryHistoryDto
 import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
-import com.hasancankula.evtelemetry.presentation.detail.bitmapDescriptorFromVector
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
 import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
 import com.patrykandpatrick.vico.compose.chart.Chart
@@ -50,7 +49,11 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = "$vehicleId Detay Paneli", fontWeight = FontWeight.Bold) },
+                // YENİ: Başlıkta artık aracın gerçek marka ve modeli yazıyor!
+                title = {
+                    val baslik = detailState.telemetry?.let { "${it.vehicleModel} (${it.vehicleId})" } ?: "$vehicleId Detay Paneli"
+                    Text(text = baslik, fontWeight = FontWeight.Bold)
+                },
                 navigationIcon = { IconButton(onClick = onBackClick) { Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri") } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary, titleContentColor = MaterialTheme.colorScheme.onPrimary, navigationIconContentColor = MaterialTheme.colorScheme.onPrimary)
             )
@@ -62,10 +65,9 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
             if (telemetry == null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
-                // YENİ MİMARİ: Ekranı ikiye bölen Column (Scroll YOK)
                 Column(modifier = Modifier.fillMaxSize()) {
 
-                    // 1. ÜST KISIM: Sabit Harita (Ekranın %45'i)
+                    // 1. ÜST KISIM: Sabit Harita
                     Box(modifier = Modifier.weight(0.45f).fillMaxWidth()) {
                         LiveMapCard(
                             latitude = telemetry.latitude,
@@ -76,17 +78,17 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
                         )
                     }
 
-                    // 2. ALT KISIM: Kaydırılabilir Kartlar (Ekranın %55'i)
+                    // 2. ALT KISIM: Kaydırılabilir Kartlar
                     Column(
                         modifier = Modifier
                             .weight(0.55f)
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()) // Scroll sadece bu alt kısıma ait
+                            .verticalScroll(rememberScrollState())
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // YENİ: Eco-Score Kartını ekrana basıyoruz
-                        EcoScoreCard(score = telemetry.eco_score)
+                        EcoScoreCard(score = telemetry.ecoScore)
+
                         SpeedAnalyticsCard(routeHistory = detailState.routeHistory)
 
                         TelemetryCard(
@@ -95,8 +97,16 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
                             containerColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
                             contentColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
                         )
+
+                        // YENİ: Statik menzil silindi, yerine Python'dan gelen gerçek dinamik menzil eklendi!
+                        TelemetryCard(
+                            title = "Dinamik Menzil (Gerçek Zamanlı)",
+                            value = "${telemetry.estimatedRangeKm} km",
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+
                         TelemetryCard(title = "Anlık Hız", value = "${telemetry.speedKmh} km/h", valueStyle = MaterialTheme.typography.displayMedium)
-                        TelemetryCard(title = "Tahmini Menzil (AI)", value = "${detailState.estimatedRange} km", containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
                         TelemetryCard(title = "Batarya Seviyesi", value = "%${telemetry.batteryLevelPct}")
                         TelemetryCard(title = "Kabin Sıcaklığı", value = "${telemetry.cabinTemperatureC} °C")
                         TelemetryCard(title = "Süspansiyon Modu", value = telemetry.suspensionMode)

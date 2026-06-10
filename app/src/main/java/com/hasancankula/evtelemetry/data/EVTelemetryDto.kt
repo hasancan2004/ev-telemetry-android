@@ -6,10 +6,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class EVTelemetryDto(
     // ==========================================
-    // YENİ: Aracın Kimliği (Plakası)
+    // YENİ: Aracın Kimliği ve Modeli
     // ==========================================
     @SerialName("vehicle_id")
     val vehicleId: String,
+
+    @SerialName("vehicle_model")
+    val vehicleModel: String = "Bilinmeyen Model", // vehiclemodel -> vehicleModel olarak düzeltildi
 
     @SerialName("speed_kmh")
     val speedKmh: Int,
@@ -39,8 +42,8 @@ data class EVTelemetryDto(
     val maintenanceRiskPct: Double = 0.0,
 
     @SerialName("eco_score")
-    val eco_score: Int = 100,
+    val ecoScore: Int = 100, // eco_score -> ecoScore olarak Kotlin standartlarına uyarlandı
 
-
-
+    @SerialName("estimated_range_km")
+    val estimatedRangeKm: Int = 0 // YENİ: Fiziksel donanıma göre hesaplanan gerçek menzil
 )
