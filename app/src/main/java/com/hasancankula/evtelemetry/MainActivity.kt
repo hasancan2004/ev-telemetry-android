@@ -13,9 +13,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
-import com.hasancankula.evtelemetry.presentation.TelemetryAppNavigation
+
 import com.hasancankula.evtelemetry.presentation.TelemetryForegroundService
 import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
+import com.hasancankula.evtelemetry.presentation.navigation.TelemetryAppNavigation
 import com.hasancankula.evtelemetry.ui.theme.EVTelemetryTheme
 
 class MainActivity : ComponentActivity() {

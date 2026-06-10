@@ -3,6 +3,7 @@ package com.hasancankula.evtelemetry.presentation
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.hasancankula.evtelemetry.data.ChargingStationDto
 import com.hasancankula.evtelemetry.data.EVTelemetryDto
 import com.hasancankula.evtelemetry.data.SettingsDataStore
 import com.hasancankula.evtelemetry.data.TelemetryHistoryDto
@@ -32,6 +33,9 @@ data class VehicleDetailState(
 // 1. Sınıf tanımını AndroidViewModel yapıyoruz ki 'application' (Context) alabilsin
 class TelemetryViewModel(application: Application) : AndroidViewModel(application) {
 
+    // İstasyon listesini tutacak StateFlow
+    private val _chargingStations = MutableStateFlow<List<ChargingStationDto>>(emptyList())
+    val chargingStations: StateFlow<List<ChargingStationDto>> = _chargingStations.asStateFlow()
     private val settingsDataStore = SettingsDataStore(application)
     private val socketService = TelemetrySocketService()
     private val rangeCalculator = SmartRangeCalculator()
@@ -72,6 +76,13 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         startFleetStream()
+        loadChargingStations()
+    }
+    private fun loadChargingStations() {
+        viewModelScope.launch {
+            val stations = socketService.getChargingStations()
+            _chargingStations.value = stations
+        }
     }
 
     private fun startFleetStream() {

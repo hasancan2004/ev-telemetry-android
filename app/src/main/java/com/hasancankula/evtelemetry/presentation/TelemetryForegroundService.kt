@@ -26,22 +26,25 @@ class TelemetryForegroundService : Service() {
     private val socketService = TelemetrySocketService()
     private val channelId = "telemetry_alerts_channel"
 
-    // Spam engelleme hafızaları
-    private val alertedVehicles = mutableSetOf<String>()
-    private val breachedVehicles = mutableSetOf<String>() // YENİ: Sınırı aşan araçların hafızası
+    // ========================================================
+    // YENİ: Spam engelleme hafızaları (Araç ID'si ve Son Bildirim Zamanı)
+    // ========================================================
+    private val lastAiAlertTime = mutableMapOf<String, Long>()
+    private val lastGeofenceAlertTime = mutableMapOf<String, Long>()
 
-    // ========================================================
-    // YENİ: GÜVENLİ BÖLGE PARAMETRELERİ (Konya Merkez)
-    // ========================================================
+    // SOĞUMA SÜRESİ: Aynı araca arka arkaya bildirim atmak için geçmesi gereken süre (1 Dakika)
+    // Test ederken çok beklersen burayı 10 * 1000L (10 saniye) yapabilirsin.
+    private val COOLDOWN_MS = 60 * 1000L
+
+    // GÜVENLİ BÖLGE PARAMETRELERİ (Konya Merkez)
     private val centerLat = 37.8746
     private val centerLng = 32.4933
-    private val maxDistanceMeters = 20000.0 // 20 Kilometre sınır
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
-        settingsDataStore = SettingsDataStore(this) // Servis zaten bir Context'tir
+        settingsDataStore = SettingsDataStore(this)
 
         // 1. Yapay Zeka sınırını sürekli dinle
         serviceScope.launch {
@@ -52,7 +55,7 @@ class TelemetryForegroundService : Service() {
 
         // 2. Geofence sınırını sürekli dinle (KM'yi metreye çevirerek kaydet)
         serviceScope.launch {
-            settingsDataStore.geofenceRadiusFlow.collect {radiusKm ->
+            settingsDataStore.geofenceRadiusFlow.collect { radiusKm ->
                 currentGeofenceRadiusMeters = radiusKm.toDouble() * 1000.0
             }
         }
@@ -76,39 +79,39 @@ class TelemetryForegroundService : Service() {
             socketService.getTelemetryStream()
                 .catch { e -> e.printStackTrace() }
                 .collect { fleetList ->
+                    val currentTime = System.currentTimeMillis() // Anlık zamanı alıyoruz
+
                     fleetList.forEach { vehicle ->
 
-                        // 1. KONTROL: YAPAY ZEKA ARIZA RİSKİ (%75)
+                        // 1. KONTROL: YAPAY ZEKA ARIZA RİSKİ
                         if (vehicle.maintenanceRiskPct > currentAiThreshold) {
-                            if (!alertedVehicles.contains(vehicle.vehicleId)) {
+                            val lastAlertTime = lastAiAlertTime[vehicle.vehicleId] ?: 0L
+
+                            // Daha önce bildirim atılmadıysa VEYA üzerinden 1 dakika (COOLDOWN_MS) geçtiyse
+                            if (currentTime - lastAlertTime > COOLDOWN_MS) {
                                 sendCriticalAlert(vehicle.vehicleId, vehicle.maintenanceRiskPct)
-                                alertedVehicles.add(vehicle.vehicleId)
+                                lastAiAlertTime[vehicle.vehicleId] = currentTime // Zamanı güncelle
                             }
-                        } else {
-                            alertedVehicles.remove(vehicle.vehicleId)
                         }
 
-                        // ========================================================
                         // 2. KONTROL: COĞRAFİ SINIR İHLALİ (GEOFENCING)
-                        // ========================================================
                         val distance = calculateDistance(vehicle.latitude, vehicle.longitude, centerLat, centerLng)
 
                         if (distance > currentGeofenceRadiusMeters) {
-                            // Araç 20 km dışına çıktıysa ve daha önce bildirim atılmadıysa alarm ver!
-                            if (!breachedVehicles.contains(vehicle.vehicleId)) {
+                            val lastGeofenceTime = lastGeofenceAlertTime[vehicle.vehicleId] ?: 0L
+
+                            // Daha önce bildirim atılmadıysa VEYA üzerinden 1 dakika (COOLDOWN_MS) geçtiyse
+                            if (currentTime - lastGeofenceTime > COOLDOWN_MS) {
                                 sendGeofenceAlert(vehicle.vehicleId, distance / 1000.0) // Metreyi KM'ye çevirip yolluyoruz
-                                breachedVehicles.add(vehicle.vehicleId)
+                                lastGeofenceAlertTime[vehicle.vehicleId] = currentTime // Zamanı güncelle
                             }
-                        } else {
-                            // Araç güvenli bölgeye geri döndüyse hafızadan sil
-                            breachedVehicles.remove(vehicle.vehicleId)
                         }
                     }
                 }
         }
     }
 
-    // YENİ: İki koordinat arasındaki kuş uçuşu mesafeyi metre cinsinden ölçen matematiksel fonksiyon (Haversine Formula)
+    // İki koordinat arasındaki kuş uçuşu mesafeyi metre cinsinden ölçen matematiksel fonksiyon (Haversine Formula)
     private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val r = 6371e3 // Dünyanın yarıçapı (metre)
         val phi1 = Math.toRadians(lat1)
@@ -124,7 +127,6 @@ class TelemetryForegroundService : Service() {
 
     private fun sendCriticalAlert(vehicleId: String, risk: Double) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val alertNotification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("🚨 KRİTİK YAPAY ZEKA UYARISI")
@@ -137,7 +139,6 @@ class TelemetryForegroundService : Service() {
         notificationManager.notify(vehicleId.hashCode(), alertNotification)
     }
 
-    // YENİ: SINIR İHLALİ BİLDİRİM MOTORU
     private fun sendGeofenceAlert(vehicleId: String, distanceKm: Double) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -150,7 +151,6 @@ class TelemetryForegroundService : Service() {
             .setAutoCancel(true)
             .build()
 
-        // Arıza bildirimiyle çakışmasın diye benzersiz bir ID (Geofence için ayrı) veriyoruz
         notificationManager.notify((vehicleId + "_geofence").hashCode(), geofenceNotification)
     }
 

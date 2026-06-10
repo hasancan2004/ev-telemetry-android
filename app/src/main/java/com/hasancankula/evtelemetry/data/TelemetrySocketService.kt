@@ -25,12 +25,11 @@ class TelemetrySocketService {
 
     private var activeSession: DefaultClientWebSocketSession? = null
 
-    // KRİTİK DEĞİŞİKLİK: Artık tek bir EVTelemetryDto değil, List<EVTelemetryDto> dönüyoruz!
     fun getTelemetryStream(): Flow<List<EVTelemetryDto>> = flow {
         try {
             val session = client.webSocketSession(
                 method = HttpMethod.Get,
-                host = "10.0.2.2",
+                host = "10.0.2.2", // YENİ TELEFON IP'MİZ
                 port = 8000,
                 path = "/ws/telemetry"
             )
@@ -39,14 +38,13 @@ class TelemetrySocketService {
             for (frame in session.incoming) {
                 if (frame is Frame.Text) {
                     val jsonText = frame.readText()
-                    // Gelen JSON Array'ini LİSTE olarak parse ediyoruz
                     val fleetData = jsonFormatter.decodeFromString<List<EVTelemetryDto>>(jsonText)
                     emit(fleetData)
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            throw e // YENİ EKLENEN SATIR: Hatayı yutma, ViewModel'e fırlat!
+            throw e
         } finally {
             activeSession = null
         }
@@ -60,10 +58,10 @@ class TelemetrySocketService {
         }
     }
 
-    // YENİ: Geçmişi çekerken artık "Hangi aracın geçmişi?" diye sorabiliyoruz
     suspend fun getTelemetryHistory(vehicleId: String): List<TelemetryHistoryDto> {
         return try {
-            val response = client.get("http://10.0.2.2:8000/api/v1/telemetry/history?vehicle_id=$vehicleId&limit=100")
+            // YENİ TELEFON IP'MİZ
+            val response = client.get("http://10.230.108.179:8000/api/v1/telemetry/history?vehicle_id=$vehicleId&limit=100")
             val jsonText = response.bodyAsText()
             jsonFormatter.decodeFromString<List<TelemetryHistoryDto>>(jsonText)
         } catch (e: Exception) {
@@ -72,6 +70,17 @@ class TelemetrySocketService {
         }
     }
 
+    // Sunucudan aktif şarj istasyonlarının listesini çeken fonksiyon
+    suspend fun getChargingStations(): List<ChargingStationDto> {
+        return try {
+            val response = client.get("http://10.230.108.179:8000/api/v1/charging-stations")
+            val jsonText = response.bodyAsText()
+            jsonFormatter.decodeFromString<List<ChargingStationDto>>(jsonText)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
     fun closeClient() {
         client.close()
     }
