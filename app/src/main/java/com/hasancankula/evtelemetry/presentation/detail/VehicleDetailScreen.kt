@@ -85,6 +85,8 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // YENİ: Eco-Score Kartını ekrana basıyoruz
+                        EcoScoreCard(score = telemetry.eco_score)
                         SpeedAnalyticsCard(routeHistory = detailState.routeHistory)
 
                         TelemetryCard(
@@ -233,6 +235,68 @@ fun SpeedAnalyticsCard(routeHistory: List<TelemetryHistoryDto>) {
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Grafik için veri toplanıyor...", style = MaterialTheme.typography.bodyMedium) }
             }
+        }
+    }
+}
+
+@Composable
+fun EcoScoreCard(score: Int) {
+    // Skora göre renk ve metin belirleme mantığı
+    val (statusColor, statusText) = when {
+        score >= 90 -> Color(0xFF4CAF50) to "Mükemmel - Verimli Sürüş"
+        score >= 70 -> Color(0xFF8BC34A) to "İyi - Standart Sürüş"
+        score >= 50 -> Color(0xFFFFC107) to "Orta - Dikkat Edilmeli"
+        else -> Color(0xFFF44336) to "Agresif Sürüş - Yüksek Tüketim"
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Eco-Score (Sürücü Analizi)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Dairesel Gösterge (Gauge)
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
+                CircularProgressIndicator(
+                    progress = { score / 100f },
+                    modifier = Modifier.fillMaxSize(),
+                    color = statusColor,
+                    strokeWidth = 12.dp,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Text(
+                    text = "$score",
+                    style = MaterialTheme.typography.displayMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = statusColor
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Durum Metni
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodyLarge,
+                color = statusColor,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
