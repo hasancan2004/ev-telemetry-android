@@ -29,7 +29,7 @@ class TelemetrySocketService {
         try {
             val session = client.webSocketSession(
                 method = HttpMethod.Get,
-                host = "10.0.2.2", // YENİ TELEFON IP'MİZ
+                host = "10.0.2.2", 
                 port = 8000,
                 path = "/ws/telemetry"
             )
