@@ -45,5 +45,8 @@ data class EVTelemetryDto(
     val ecoScore: Int = 100, // eco_score -> ecoScore olarak Kotlin standartlarına uyarlandı
 
     @SerialName("estimated_range_km")
-    val estimatedRangeKm: Int = 0 // YENİ: Fiziksel donanıma göre hesaplanan gerçek menzil
+    val estimatedRangeKm: Int = 0,// YENİ: Fiziksel donanıma göre hesaplanan gerçek menzil
+
+    @SerialName("geofence_breach")
+    val geofenceBreach: Boolean = false
 )

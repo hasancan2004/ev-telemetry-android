@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +68,9 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
 
+                    if (telemetry.geofenceBreach) {
+                        GeofenceAlertCard()
+                    }
                     // 1. ÜST KISIM: Sabit Harita
                     Box(modifier = Modifier.weight(0.45f).fillMaxWidth()) {
                         LiveMapCard(
@@ -307,6 +311,46 @@ fun EcoScoreCard(score: Int) {
                 color = statusColor,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+@Composable
+fun GeofenceAlertCard() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = androidx.compose.material.icons.Icons.Default.Warning,
+                contentDescription = "Güvenlik İhlali",
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(32.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = "GÜVENLİK İHLALİ!",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = "Araç izin verilen 20 km'lik operasyon bölgesinin dışına çıktı.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
         }
     }
 }
