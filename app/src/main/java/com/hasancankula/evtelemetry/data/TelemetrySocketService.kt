@@ -7,7 +7,6 @@ import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpMethod
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import io.ktor.websocket.send
@@ -17,22 +16,24 @@ import kotlinx.serialization.json.Json
 
 class TelemetrySocketService {
 
+    // Railway ile bağlantı için SSL (WSS/HTTPS) destekli client
     private val client = HttpClient(CIO) {
-        install(WebSockets)
+        install(WebSockets) {
+            pingInterval = 20_000
+        }
     }
 
     private val jsonFormatter = Json { ignoreUnknownKeys = true }
-
     private var activeSession: DefaultClientWebSocketSession? = null
+
+    // Bulut Adresimiz
+    private val BASE_URL = "https://ev-telemetry-backend-production.up.railway.app"
+    private val WS_URL = "wss://ev-telemetry-backend-production.up.railway.app/ws/telemetry"
 
     fun getTelemetryStream(): Flow<List<EVTelemetryDto>> = flow {
         try {
-            val session = client.webSocketSession(
-                method = HttpMethod.Get,
-                host = "10.0.2.2", 
-                port = 8000,
-                path = "/ws/telemetry"
-            )
+            // Portsuz, wss üzerinden doğrudan bağlantı
+            val session = client.webSocketSession(WS_URL)
             activeSession = session
 
             for (frame in session.incoming) {
@@ -60,8 +61,7 @@ class TelemetrySocketService {
 
     suspend fun getTelemetryHistory(vehicleId: String): List<TelemetryHistoryDto> {
         return try {
-            // YENİ TELEFON IP'MİZ
-            val response = client.get("http://10.230.108.179:8000/api/v1/telemetry/history?vehicle_id=$vehicleId&limit=100")
+            val response = client.get("$BASE_URL/api/v1/telemetry/history?vehicle_id=$vehicleId&limit=100")
             val jsonText = response.bodyAsText()
             jsonFormatter.decodeFromString<List<TelemetryHistoryDto>>(jsonText)
         } catch (e: Exception) {
@@ -70,10 +70,9 @@ class TelemetrySocketService {
         }
     }
 
-    // Sunucudan aktif şarj istasyonlarının listesini çeken fonksiyon
     suspend fun getChargingStations(): List<ChargingStationDto> {
         return try {
-            val response = client.get("http://10.230.108.179:8000/api/v1/charging-stations")
+            val response = client.get("$BASE_URL/api/v1/charging-stations")
             val jsonText = response.bodyAsText()
             jsonFormatter.decodeFromString<List<ChargingStationDto>>(jsonText)
         } catch (e: Exception) {
@@ -81,6 +80,7 @@ class TelemetrySocketService {
             emptyList()
         }
     }
+
     fun closeClient() {
         client.close()
     }
