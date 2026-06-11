@@ -16,7 +16,6 @@ import kotlinx.serialization.json.Json
 
 class TelemetrySocketService {
 
-    // Railway ile bağlantı için SSL (WSS/HTTPS) destekli client
     private val client = HttpClient(CIO) {
         install(WebSockets) {
             pingInterval = 20_000
@@ -26,13 +25,11 @@ class TelemetrySocketService {
     private val jsonFormatter = Json { ignoreUnknownKeys = true }
     private var activeSession: DefaultClientWebSocketSession? = null
 
-    // Bulut Adresimiz
-    // Sondaki / (slash) silindi
     private val BASE_URL = "https://ev-telemetry-backend-production.up.railway.app"
     private val WS_URL = "wss://ev-telemetry-backend-production.up.railway.app/ws/telemetry"
+
     fun getTelemetryStream(): Flow<List<EVTelemetryDto>> = flow {
         try {
-            // Portsuz, wss üzerinden doğrudan bağlantı
             val session = client.webSocketSession(WS_URL)
             activeSession = session
 
@@ -53,8 +50,15 @@ class TelemetrySocketService {
 
     suspend fun sendCommand(commandJson: String) {
         try {
-            activeSession?.send(Frame.Text(commandJson))
+            println("📡 TELEFON MESAJ GÖNDERMEYİ DENİYOR: $commandJson")
+            if (activeSession != null) {
+                activeSession?.send(Frame.Text(commandJson))
+                println("✅ MESAJ BAŞARIYLA BULUTA UÇTU!")
+            } else {
+                println("❌ HATA: WebSocket oturumu aktif değil (activeSession null)!")
+            }
         } catch (e: Exception) {
+            println("❌ HATA: Mesaj gönderilirken çöktü -> ${e.localizedMessage}")
             e.printStackTrace()
         }
     }

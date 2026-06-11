@@ -24,35 +24,21 @@ import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
 fun FleetDashboardScreen(viewModel: TelemetryViewModel, onVehicleClick: (String) -> Unit) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(text = "Filo Kontrol Merkezi", fontWeight = FontWeight.Bold) },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Surface(modifier = Modifier.fillMaxSize().padding(paddingValues), color = MaterialTheme.colorScheme.surfaceVariant) {
-            when (val state = uiState) {
-                is FleetUiState.Loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                is FleetUiState.Error -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text = "Hata:\n${state.message}", color = MaterialTheme.colorScheme.error) }
-                is FleetUiState.Success -> {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceVariant) {
+        when (val state = uiState) {
+            is FleetUiState.Loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            is FleetUiState.Error -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(text = "Hata:\n${state.message}", color = MaterialTheme.colorScheme.error) }
+            is FleetUiState.Success -> {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    FleetSummaryPanel(vehicles = state.vehicles)
 
-                    // YENİ: Listenin dışına, her zaman tepede kalacak FİLO ÖZETİ (Dashboard) ekliyoruz
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        FleetSummaryPanel(vehicles = state.vehicles)
-
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            items(state.vehicles) { vehicle ->
-                                VehicleFleetCard(vehicle = vehicle, onClick = { onVehicleClick(vehicle.vehicleId) })
-                            }
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(state.vehicles) { vehicle ->
+                            VehicleFleetCard(vehicle = vehicle, onClick = { onVehicleClick(vehicle.vehicleId) })
                         }
                     }
                 }

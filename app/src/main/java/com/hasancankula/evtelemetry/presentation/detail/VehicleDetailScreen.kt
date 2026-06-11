@@ -6,7 +6,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -24,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -41,89 +39,75 @@ import com.patrykandpatrick.vico.compose.chart.line.lineChart
 import com.patrykandpatrick.vico.core.entry.FloatEntry
 import com.patrykandpatrick.vico.core.entry.entryModelOf
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBackClick: () -> Unit) {
     val detailState by viewModel.detailState.collectAsStateWithLifecycle()
     val chargingStations by viewModel.chargingStations.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                // YENİ: Başlıkta artık aracın gerçek marka ve modeli yazıyor!
-                title = {
-                    val baslik = detailState.telemetry?.let { "${it.vehicleModel} (${it.vehicleId})" } ?: "$vehicleId Detay Paneli"
-                    Text(text = baslik, fontWeight = FontWeight.Bold)
-                },
-                navigationIcon = { IconButton(onClick = onBackClick) { Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary, titleContentColor = MaterialTheme.colorScheme.onPrimary, navigationIconContentColor = MaterialTheme.colorScheme.onPrimary)
-            )
-        }
-    ) { paddingValues ->
-        Surface(modifier = Modifier.fillMaxSize().padding(paddingValues), color = MaterialTheme.colorScheme.surfaceVariant) {
-            val telemetry = detailState.telemetry
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceVariant) {
+        val telemetry = detailState.telemetry
 
-            if (telemetry == null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            } else {
-                Column(modifier = Modifier.fillMaxSize()) {
+        if (telemetry == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
 
-                    if (telemetry.geofenceBreach) {
-                        GeofenceAlertCard()
-                    }
-                    // 1. ÜST KISIM: Sabit Harita
-                    Box(modifier = Modifier.weight(0.45f).fillMaxWidth()) {
-                        LiveMapCard(
-                            latitude = telemetry.latitude,
-                            longitude = telemetry.longitude,
-                            speed = telemetry.speedKmh,
-                            chargingStations = chargingStations,
-                            routeHistory = detailState.routeHistory
-                        )
-                    }
+                if (telemetry.geofenceBreach) {
+                    GeofenceAlertCard()
+                }
 
-                    // 2. ALT KISIM: Kaydırılabilir Kartlar
-                    Column(
-                        modifier = Modifier
-                            .weight(0.55f)
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        EcoScoreCard(score = telemetry.ecoScore)
+                // 1. ÜST KISIM: Sabit Harita
+                Box(modifier = Modifier.weight(0.45f).fillMaxWidth()) {
+                    LiveMapCard(
+                        latitude = telemetry.latitude,
+                        longitude = telemetry.longitude,
+                        speed = telemetry.speedKmh,
+                        chargingStations = chargingStations,
+                        routeHistory = detailState.routeHistory
+                    )
+                }
 
-                        SpeedAnalyticsCard(routeHistory = detailState.routeHistory)
+                // 2. ALT KISIM: Kaydırılabilir Kartlar
+                Column(
+                    modifier = Modifier
+                        .weight(0.55f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    EcoScoreCard(score = telemetry.ecoScore)
 
-                        TelemetryCard(
-                            title = "Yapay Zeka Arıza Riski",
-                            value = "%${telemetry.maintenanceRiskPct}",
-                            containerColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                    SpeedAnalyticsCard(routeHistory = detailState.routeHistory)
 
-                        // YENİ: Statik menzil silindi, yerine Python'dan gelen gerçek dinamik menzil eklendi!
-                        TelemetryCard(
-                            title = "Dinamik Menzil (Gerçek Zamanlı)",
-                            value = "${telemetry.estimatedRangeKm} km",
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
+                    TelemetryCard(
+                        title = "Yapay Zeka Arıza Riski",
+                        value = "%${telemetry.maintenanceRiskPct}",
+                        containerColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                    )
 
-                        TelemetryCard(title = "Anlık Hız", value = "${telemetry.speedKmh} km/h", valueStyle = MaterialTheme.typography.displayMedium)
-                        TelemetryCard(title = "Batarya Seviyesi", value = "%${telemetry.batteryLevelPct}")
-                        TelemetryCard(title = "Kabin Sıcaklığı", value = "${telemetry.cabinTemperatureC} °C")
-                        TelemetryCard(title = "Süspansiyon Modu", value = telemetry.suspensionMode)
+                    TelemetryCard(
+                        title = "Dinamik Menzil (Gerçek Zamanlı)",
+                        value = "${telemetry.estimatedRangeKm} km",
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
 
-                        ControlPanelCard(onModeSelected = { secilenMod -> viewModel.setSuspensionMode(vehicleId, secilenMod) })
-                    }
+                    TelemetryCard(title = "Anlık Hız", value = "${telemetry.speedKmh} km/h", valueStyle = MaterialTheme.typography.displayMedium)
+                    TelemetryCard(title = "Batarya Seviyesi", value = "%${telemetry.batteryLevelPct}")
+                    TelemetryCard(title = "Kabin Sıcaklığı", value = "${telemetry.cabinTemperatureC} °C")
+                    TelemetryCard(title = "Süspansiyon Modu", value = telemetry.suspensionMode)
+
+                    ControlPanelCard(onModeSelected = { secilenMod -> viewModel.setSuspensionMode(vehicleId, secilenMod) })
                 }
             }
         }
     }
 }
 
-// YENİ: Drawable'ı Marker için ikona çeviren sihirli fonksiyon
 fun bitmapDescriptorFromVector(context: Context, vectorResId: Int): BitmapDescriptor? {
     val drawable = androidx.core.content.ContextCompat.getDrawable(context, vectorResId) ?: return null
     drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
@@ -141,7 +125,7 @@ fun LiveMapCard(
     chargingStations: List<ChargingStationDto>,
     routeHistory: List<TelemetryHistoryDto>
 ) {
-    val context = LocalContext.current // İkonu oluşturmak için Context lazım
+    val context = LocalContext.current
     val carLocation = LatLng(latitude, longitude)
     val polylinePoints = routeHistory.map { LatLng(it.latitude, it.longitude) }
 
@@ -170,14 +154,9 @@ fun LiveMapCard(
         ) {
             if (polylinePoints.isNotEmpty()) Polyline(points = polylinePoints, color = Color.Blue, width = 12f)
 
-            // Araç Markeri
             Marker(state = MarkerState(position = carLocation), title = "Araç Konumu", snippet = "Hız: $speed km/h")
 
-            // YENİ: Şarj İstasyonlarını Özel İkonla Çiz
             chargingStations.forEach { station ->
-
-                // 1. Önce senin az önce oluşturduğun havalı ikonu (ic_charging_station) bulmaya çalışıyoruz.
-                // 2. Eğer bulamazsa (veya adını yanlış yazdıysan), veri geldiğini kanıtlamak için MAVİ DAMLA koyacak.
                 val customIcon = bitmapDescriptorFromVector(context, R.drawable.ic_charging_station)
                     ?: BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
 
@@ -197,8 +176,8 @@ fun LiveMapCard(
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)
                     .size(44.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                containerColor = Color(0xFF4A5D8A),
+                contentColor = Color.White
             ) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
@@ -226,7 +205,7 @@ fun ControlPanelCard(onModeSelected: (String) -> Unit) {
 }
 
 @Composable
-fun TelemetryCard(title: String, value: String, valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineMedium, containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surface, contentColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary) {
+fun TelemetryCard(title: String, value: String, valueStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineMedium, containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surface, contentColor: androidx.compose.ui.graphics.Color = Color(0xFF4A5D8A)) {
     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = containerColor)) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = title, style = MaterialTheme.typography.titleMedium, color = contentColor)
@@ -241,7 +220,7 @@ fun SpeedAnalyticsCard(routeHistory: List<TelemetryHistoryDto>) {
     val chartEntries = routeHistory.mapIndexed { index, dto -> FloatEntry(x = index.toFloat(), y = dto.speedKmh.toFloat()) }
     Card(modifier = Modifier.fillMaxWidth().height(250.dp).padding(horizontal = 16.dp), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(defaultElevation = 6.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(text = "Hız Analizi (Son 100 Veri)", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text(text = "Hız Analizi (Son 100 Veri)", style = MaterialTheme.typography.titleMedium, color = Color(0xFF4A5D8A), fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
             if (chartEntries.size > 1) {
                 val chartEntryModel = entryModelOf(chartEntries)
@@ -255,7 +234,6 @@ fun SpeedAnalyticsCard(routeHistory: List<TelemetryHistoryDto>) {
 
 @Composable
 fun EcoScoreCard(score: Int) {
-    // Skora göre renk ve metin belirleme mantığı
     val (statusColor, statusText) = when {
         score >= 90 -> Color(0xFF4CAF50) to "Mükemmel - Verimli Sürüş"
         score >= 70 -> Color(0xFF8BC34A) to "İyi - Standart Sürüş"
@@ -264,28 +242,14 @@ fun EcoScoreCard(score: Int) {
     }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Eco-Score (Sürücü Analizi)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(text = "Eco-Score (Sürücü Analizi)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF4A5D8A))
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Dairesel Gösterge (Gauge)
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
                 CircularProgressIndicator(
                     progress = { score / 100f },
@@ -294,23 +258,10 @@ fun EcoScoreCard(score: Int) {
                     strokeWidth = 12.dp,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
-                Text(
-                    text = "$score",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = statusColor
-                )
+                Text(text = "$score", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold, color = statusColor)
             }
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // Durum Metni
-            Text(
-                text = statusText,
-                style = MaterialTheme.typography.bodyLarge,
-                color = statusColor,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text(text = statusText, style = MaterialTheme.typography.bodyLarge, color = statusColor, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -318,38 +269,17 @@ fun EcoScoreCard(score: Int) {
 @Composable
 fun GeofenceAlertCard() {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Warning,
-                contentDescription = "Güvenlik İhlali",
-                tint = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.size(32.dp)
-            )
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(imageVector = Icons.Default.Warning, contentDescription = "Güvenlik İhlali", tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(32.dp))
             Spacer(modifier = Modifier.width(16.dp))
             Column {
-                Text(
-                    text = "GÜVENLİK İHLALİ!",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Text(
-                    text = "Araç izin verilen 20 km'lik operasyon bölgesinin dışına çıktı.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
+                Text(text = "GÜVENLİK İHLALİ!", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(text = "Araç izin verilen 20 km'lik operasyon bölgesinin dışına çıktı.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
     }
