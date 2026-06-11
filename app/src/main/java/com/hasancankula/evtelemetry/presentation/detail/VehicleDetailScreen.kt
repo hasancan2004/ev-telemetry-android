@@ -65,7 +65,11 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
                         longitude = telemetry.longitude,
                         speed = telemetry.speedKmh,
                         chargingStations = chargingStations,
-                        routeHistory = detailState.routeHistory
+                        routeHistory = detailState.routeHistory,
+                        onReserveClick = { stationId ->
+                            // TODO: Bir sonraki adımda ViewModel üzerinden REST API POST atacağız!
+                            println("REZERVASYON BUTONUNA BASILDI: $stationId")
+                        }
                     )
                 }
 
@@ -79,28 +83,23 @@ fun VehicleDetailScreen(vehicleId: String, viewModel: TelemetryViewModel, onBack
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     EcoScoreCard(score = telemetry.ecoScore)
-
                     SpeedAnalyticsCard(routeHistory = detailState.routeHistory)
-
                     TelemetryCard(
                         title = "Yapay Zeka Arıza Riski",
                         value = "%${telemetry.maintenanceRiskPct}",
                         containerColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
                         contentColor = if(telemetry.maintenanceRiskPct > 50.0) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
                     )
-
                     TelemetryCard(
                         title = "Dinamik Menzil (Gerçek Zamanlı)",
                         value = "${telemetry.estimatedRangeKm} km",
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                     )
-
                     TelemetryCard(title = "Anlık Hız", value = "${telemetry.speedKmh} km/h", valueStyle = MaterialTheme.typography.displayMedium)
                     TelemetryCard(title = "Batarya Seviyesi", value = "%${telemetry.batteryLevelPct}")
                     TelemetryCard(title = "Kabin Sıcaklığı", value = "${telemetry.cabinTemperatureC} °C")
                     TelemetryCard(title = "Süspansiyon Modu", value = telemetry.suspensionMode)
-
                     ControlPanelCard(onModeSelected = { secilenMod -> viewModel.setSuspensionMode(vehicleId, secilenMod) })
                 }
             }
@@ -117,13 +116,15 @@ fun bitmapDescriptorFromVector(context: Context, vectorResId: Int): BitmapDescri
     return BitmapDescriptorFactory.fromBitmap(bm)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveMapCard(
     latitude: Double,
     longitude: Double,
     speed: Int,
     chargingStations: List<ChargingStationDto>,
-    routeHistory: List<TelemetryHistoryDto>
+    routeHistory: List<TelemetryHistoryDto>,
+    onReserveClick: (String) -> Unit
 ) {
     val context = LocalContext.current
     val carLocation = LatLng(latitude, longitude)
@@ -134,6 +135,10 @@ fun LiveMapCard(
     }
 
     var isFollowingCar by remember { mutableStateOf(true) }
+
+    // YENİ: BottomSheet State Kontrolleri
+    var selectedStation by remember { mutableStateOf<ChargingStationDto?>(null) }
+    var showBottomSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(cameraPositionState.isMoving) {
         if (cameraPositionState.isMoving && cameraPositionState.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE) {
@@ -157,14 +162,24 @@ fun LiveMapCard(
             Marker(state = MarkerState(position = carLocation), title = "Araç Konumu", snippet = "Hız: $speed km/h")
 
             chargingStations.forEach { station ->
+                // İstasyon doluysa kırmızı, boşsa normal (mavi) ikonu kullan
                 val customIcon = bitmapDescriptorFromVector(context, R.drawable.ic_charging_station)
-                    ?: BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                val finalIcon = if (station.is_available) {
+                    customIcon ?: BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                } else {
+                    BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                }
 
                 Marker(
                     state = MarkerState(position = LatLng(station.latitude, station.longitude)),
                     title = "${station.provider} - ${station.name}",
                     snippet = if (station.is_available) "Müsait (Hızlı Şarj)" else "Dolu / Arızalı",
-                    icon = customIcon
+                    icon = finalIcon,
+                    onClick = {
+                        selectedStation = station
+                        showBottomSheet = true
+                        true // Tıklamayı yut, varsayılan info window yerine bizim BottomSheet açılsın
+                    }
                 )
             }
         }
@@ -184,6 +199,39 @@ fun LiveMapCard(
                     contentDescription = "Araca Odaklan",
                     modifier = Modifier.size(24.dp)
                 )
+            }
+        }
+
+        // YENİ: Tıklanan İstasyonun Detaylarını Gösteren Alt Panel (BottomSheet)
+        if (showBottomSheet && selectedStation != null) {
+            ModalBottomSheet(
+                onDismissRequest = { showBottomSheet = false },
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Şarj İstasyonu Detayı", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFF4A5D8A))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("${selectedStation!!.provider} - ${selectedStation!!.name}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(if (selectedStation!!.is_available) "Durum: Müsait" else "Durum: Dolu", color = if (selectedStation!!.is_available) Color(0xFF4CAF50) else Color.Red, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Button(
+                        onClick = {
+                            onReserveClick(selectedStation!!.id)
+                            showBottomSheet = false
+                        },
+                        enabled = selectedStation!!.is_available,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A5D8A))
+                    ) {
+                        Text(if (selectedStation!!.is_available) "Hemen Rezerve Et" else "Şu An Rezerve Edilemez", fontSize = MaterialTheme.typography.titleMedium.fontSize)
+                    }
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
             }
         }
     }
