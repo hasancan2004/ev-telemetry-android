@@ -1,8 +1,12 @@
 package com.hasancankula.evtelemetry.presentation
 
 import android.app.Application
+import android.app.NotificationManager
+import android.content.Context
+import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.hasancankula.evtelemetry.R
 import com.hasancankula.evtelemetry.data.ChargingStationDto
 import com.hasancankula.evtelemetry.data.EVTelemetryDto
 import com.hasancankula.evtelemetry.data.SettingsDataStore
@@ -31,11 +35,16 @@ data class VehicleDetailState(
 
 class TelemetryViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val appContext = application.applicationContext
     private val _chargingStations = MutableStateFlow<List<ChargingStationDto>>(emptyList())
     val chargingStations: StateFlow<List<ChargingStationDto>> = _chargingStations.asStateFlow()
     private val settingsDataStore = SettingsDataStore(application)
     private val socketService = TelemetrySocketService()
     private val rangeCalculator = SmartRangeCalculator()
+
+    // YENİ: Bildirimleri spamlamamak için hafıza
+    private val notifiedRiskVehicles = mutableSetOf<String>()
+    private val notifiedGeofenceVehicles = mutableSetOf<String>()
 
     // ==========================================
     // DİNAMİK AYARLAR (DATASTORE BAĞLANTILI)
@@ -89,6 +98,9 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                 .collect { fleetList ->
                     _uiState.value = FleetUiState.Success(fleetList)
 
+                    // YENİ: Gelen verilerde bildirim gerektiren kural ihlali var mı diye kontrol et!
+                    checkAndTriggerNotifications(fleetList)
+
                     selectedVehicleId?.let { id ->
                         val activeVehicle = fleetList.find { it.vehicleId == id }
                         activeVehicle?.let { vehicle ->
@@ -115,6 +127,60 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    // YENİ: Bildirimleri fırlatan sihirli fonksiyon
+    private fun checkAndTriggerNotifications(fleetList: List<EVTelemetryDto>) {
+        val currentThreshold = aiAlarmThreshold.value
+
+        fleetList.forEach { vehicle ->
+            // 1. YAPAY ZEKA ARIZA RİSKİ KONTROLÜ
+            if (vehicle.maintenanceRiskPct >= currentThreshold) {
+                if (!notifiedRiskVehicles.contains(vehicle.vehicleId)) {
+                    sendPushNotification(
+                        title = "🚨 KRİTİK: Yüksek Arıza Riski!",
+                        message = "${vehicle.vehicleModel} (${vehicle.vehicleId}) aracında %${vehicle.maintenanceRiskPct} arıza riski tespit edildi. Acil bakım önerilir.",
+                        notificationId = vehicle.vehicleId.hashCode() + 1
+                    )
+                    notifiedRiskVehicles.add(vehicle.vehicleId) // Tekrar atmaması için işaretle
+                }
+            } else {
+                // Risk düştüyse hafızadan sil (ileride artarsa tekrar uyarsın)
+                notifiedRiskVehicles.remove(vehicle.vehicleId)
+            }
+
+            // 2. GEOFENCE İHLAL KONTROLÜ
+            if (vehicle.geofenceBreach) {
+                if (!notifiedGeofenceVehicles.contains(vehicle.vehicleId)) {
+                    sendPushNotification(
+                        title = "📍 İHLAL: Sınır Dışı Araç!",
+                        message = "${vehicle.vehicleModel} (${vehicle.vehicleId}) aracı güvenli bölge sınırlarını aştı!",
+                        notificationId = vehicle.vehicleId.hashCode() + 2
+                    )
+                    notifiedGeofenceVehicles.add(vehicle.vehicleId)
+                }
+            } else {
+                notifiedGeofenceVehicles.remove(vehicle.vehicleId)
+            }
+        }
+    }
+
+    private fun sendPushNotification(title: String, message: String, notificationId: Int) {
+        val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // MainActivity'de kurduğumuz kanal ID'si ile aynı olmalı
+        val channelId = "telemetry_alerts_channel"
+
+        val notification = NotificationCompat.Builder(appContext, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_background) // Projende ic_warning yoksa, ic_launcher veya elindeki bir iconu yaz
+            .setContentTitle(title)
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .build()
+
+        notificationManager.notify(notificationId, notification)
+    }
+
     fun selectVehicle(vehicleId: String) {
         selectedVehicleId = vehicleId
         _detailState.value = VehicleDetailState()
@@ -131,14 +197,8 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         _detailState.value = VehicleDetailState()
     }
 
-    // ==========================================
-    // ÇİFT YÖNLÜ İLETİŞİM (REMOTE COMMANDS)
-    // ==========================================
-
-    // GÜNCELLENDİ: Python backend'in beklediği tam JSON formatı oluşturuldu.
     fun setSuspensionMode(vehicleId: String, mode: String) {
         viewModelScope.launch {
-            // Python'daki `data.get("action")` ve `data.get("value")` ile eşleşmeli
             val commandJson = """
                 {
                     "action": "set_suspension",
@@ -148,6 +208,15 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
             """.trimIndent()
 
             socketService.sendCommand(commandJson)
+        }
+    }
+
+    fun reserveStation(stationId: String) {
+        viewModelScope.launch {
+            val success = socketService.reserveChargingStation(stationId)
+            if (success) {
+                loadChargingStations()
+            }
         }
     }
 

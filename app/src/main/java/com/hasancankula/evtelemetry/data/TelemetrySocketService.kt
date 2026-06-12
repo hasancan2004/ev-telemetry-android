@@ -6,6 +6,7 @@ import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
@@ -82,6 +83,21 @@ class TelemetrySocketService {
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
+        }
+    }
+
+    // İŞTE EKSİK OLAN VE HATAYI ÇÖZECEK FONKSİYON BURASI (REST API POST)
+    suspend fun reserveChargingStation(stationId: String): Boolean {
+        return try {
+            println("📡 REZERVASYON İSTEĞİ GÖNDERİLİYOR: $stationId")
+            val response = client.post("$BASE_URL/api/v1/charging-stations/$stationId/reserve")
+            val isSuccess = response.status.value in 200..299
+            if (isSuccess) println("✅ REZERVASYON BAŞARILI!") else println("❌ REZERVASYON BAŞARISIZ: Hata Kodu ${response.status.value}")
+            isSuccess
+        } catch (e: Exception) {
+            println("❌ HATA: Rezervasyon atılırken çöktü -> ${e.localizedMessage}")
+            e.printStackTrace()
+            false
         }
     }
 
