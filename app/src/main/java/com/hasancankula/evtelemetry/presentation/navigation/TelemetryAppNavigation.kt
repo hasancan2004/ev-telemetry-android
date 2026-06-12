@@ -16,6 +16,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 
+import com.hasancankula.evtelemetry.chat.presentation.ChatScreen
 import com.hasancankula.evtelemetry.presentation.Screen
 import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
 import com.hasancankula.evtelemetry.presentation.analytics.AnalyticsScreen
@@ -29,14 +30,16 @@ import com.hasancankula.evtelemetry.presentation.settings.SettingsScreen
 fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
     val navController = rememberNavController()
 
-    // YENİ: Alt menüye Screen.Analytics'i ekledik!
-    // (Bunun çalışması için Screen.kt içine object Analytics satırını eklemeyi unutma)
-    val items = listOf(Screen.Fleet, Screen.Analytics, Screen.Geofence, Screen.Settings)
+    // YENİ: Alt menüye Screen.Chat'i de ekledik
+    val items = listOf(Screen.Fleet, Screen.Analytics, Screen.Chat, Screen.Geofence, Screen.Settings)
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
     val brandColor = Color(0xFF4A5D8A)
+
+    // Hem araç detayı hem de asistan ekranında alt menüyü gizlemek istersen isDetailScreen şartını genişletebilirsin.
+    // Şimdilik sadece vehicle_detail'da gizliyoruz, asistanda alt menü kalıyor.
     val isDetailScreen = currentRoute?.startsWith("vehicle_detail") == true
 
     Scaffold(
@@ -46,7 +49,8 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                     Screen.Fleet.route -> "Filo Kontrol Merkezi"
                     Screen.Geofence.route -> "Güvenlik Bölgeleri"
                     Screen.Settings.route -> "Filo Kontrol Ayarları"
-                    Screen.Analytics.route -> "Filo Performans Raporları" // YENİ
+                    Screen.Analytics.route -> "Filo Performans Raporları"
+                    Screen.Chat.route -> "Yapay Zeka Asistanı" // YENİ
                     else -> "Filo Kontrol Merkezi"
                 }
 
@@ -114,15 +118,16 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                     }
                 )
             }
-            // YENİ: Analiz ekranı yönlendirmesi
             composable(Screen.Analytics.route) {
-                // Ekran açıldığında verileri yenile (pull-to-refresh mantığı)
                 LaunchedEffect(Unit) {
                     viewModel.fetchAnalytics()
                 }
-
                 val analyticsData by viewModel.analyticsData.collectAsStateWithLifecycle()
                 AnalyticsScreen(analyticsData = analyticsData)
+            }
+            // YENİ: Asistan ekranı yönlendirmesi
+            composable(Screen.Chat.route) {
+                ChatScreen()
             }
             composable(Screen.Geofence.route) {
                 GeofenceMapScreen(viewModel = viewModel)
