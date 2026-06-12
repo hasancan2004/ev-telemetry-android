@@ -86,7 +86,6 @@ class TelemetrySocketService {
         }
     }
 
-    // İŞTE EKSİK OLAN VE HATAYI ÇÖZECEK FONKSİYON BURASI (REST API POST)
     suspend fun reserveChargingStation(stationId: String): Boolean {
         return try {
             println("📡 REZERVASYON İSTEĞİ GÖNDERİLİYOR: $stationId")
@@ -98,6 +97,20 @@ class TelemetrySocketService {
             println("❌ HATA: Rezervasyon atılırken çöktü -> ${e.localizedMessage}")
             e.printStackTrace()
             false
+        }
+    }
+
+    // YENİ: Analiz ve Raporlama verilerini çeken GET isteği
+    suspend fun getAnalytics(): AnalyticsKpiDto? {
+        return try {
+            val response = client.get("$BASE_URL/api/v1/analytics")
+            val jsonText = response.bodyAsText()
+            // JSON'ın içindeki "kpi" objesini alıp döndürüyoruz
+            val dto = jsonFormatter.decodeFromString<AnalyticsResponseDto>(jsonText)
+            dto.kpi
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 

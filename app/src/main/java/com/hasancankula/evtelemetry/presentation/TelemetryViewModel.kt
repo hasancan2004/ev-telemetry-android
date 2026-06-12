@@ -7,6 +7,7 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hasancankula.evtelemetry.R
+import com.hasancankula.evtelemetry.data.AnalyticsKpiDto
 import com.hasancankula.evtelemetry.data.ChargingStationDto
 import com.hasancankula.evtelemetry.data.EVTelemetryDto
 import com.hasancankula.evtelemetry.data.SettingsDataStore
@@ -42,13 +43,12 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     private val socketService = TelemetrySocketService()
     private val rangeCalculator = SmartRangeCalculator()
 
-    // YENİ: Bildirimleri spamlamamak için hafıza
     private val notifiedRiskVehicles = mutableSetOf<String>()
     private val notifiedGeofenceVehicles = mutableSetOf<String>()
 
-    // ==========================================
-    // DİNAMİK AYARLAR (DATASTORE BAĞLANTILI)
-    // ==========================================
+    // YENİ: Analiz verilerini tutacak StateFlow
+    private val _analyticsData = MutableStateFlow<AnalyticsKpiDto?>(null)
+    val analyticsData: StateFlow<AnalyticsKpiDto?> = _analyticsData.asStateFlow()
 
     val aiAlarmThreshold: StateFlow<Float> = settingsDataStore.aiThresholdFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 75f)
@@ -64,10 +64,6 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { settingsDataStore.saveGeofenceRadius(newValue) }
     }
 
-    // ==========================================
-    // FİLO VE ARAÇ DURUMU (UI STATE)
-    // ==========================================
-
     private val _uiState = MutableStateFlow<FleetUiState>(FleetUiState.Loading)
     val uiState: StateFlow<FleetUiState> = _uiState.asStateFlow()
 
@@ -80,12 +76,21 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         startFleetStream()
         loadChargingStations()
+        fetchAnalytics() // Başlangıçta analizleri de yükle
     }
 
     private fun loadChargingStations() {
         viewModelScope.launch {
             val stations = socketService.getChargingStations()
             _chargingStations.value = stations
+        }
+    }
+
+    // YENİ: Python'dan Analizleri Çek
+    fun fetchAnalytics() {
+        viewModelScope.launch {
+            val data = socketService.getAnalytics()
+            _analyticsData.value = data
         }
     }
 
@@ -97,15 +102,12 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 .collect { fleetList ->
                     _uiState.value = FleetUiState.Success(fleetList)
-
-                    // YENİ: Gelen verilerde bildirim gerektiren kural ihlali var mı diye kontrol et!
                     checkAndTriggerNotifications(fleetList)
 
                     selectedVehicleId?.let { id ->
                         val activeVehicle = fleetList.find { it.vehicleId == id }
                         activeVehicle?.let { vehicle ->
                             val dynamicRange = rangeCalculator.calculateDynamicRange(vehicle)
-
                             val currentPoint = TelemetryHistoryDto(
                                 vehicleId = vehicle.vehicleId,
                                 latitude = vehicle.latitude,
@@ -115,7 +117,6 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                             if (currentRouteHistory.isEmpty() || currentRouteHistory.last().latitude != vehicle.latitude) {
                                 currentRouteHistory = currentRouteHistory + currentPoint
                             }
-
                             _detailState.value = VehicleDetailState(
                                 telemetry = vehicle,
                                 estimatedRange = dynamicRange,
@@ -127,12 +128,9 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // YENİ: Bildirimleri fırlatan sihirli fonksiyon
     private fun checkAndTriggerNotifications(fleetList: List<EVTelemetryDto>) {
         val currentThreshold = aiAlarmThreshold.value
-
         fleetList.forEach { vehicle ->
-            // 1. YAPAY ZEKA ARIZA RİSKİ KONTROLÜ
             if (vehicle.maintenanceRiskPct >= currentThreshold) {
                 if (!notifiedRiskVehicles.contains(vehicle.vehicleId)) {
                     sendPushNotification(
@@ -140,14 +138,12 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                         message = "${vehicle.vehicleModel} (${vehicle.vehicleId}) aracında %${vehicle.maintenanceRiskPct} arıza riski tespit edildi. Acil bakım önerilir.",
                         notificationId = vehicle.vehicleId.hashCode() + 1
                     )
-                    notifiedRiskVehicles.add(vehicle.vehicleId) // Tekrar atmaması için işaretle
+                    notifiedRiskVehicles.add(vehicle.vehicleId)
                 }
             } else {
-                // Risk düştüyse hafızadan sil (ileride artarsa tekrar uyarsın)
                 notifiedRiskVehicles.remove(vehicle.vehicleId)
             }
 
-            // 2. GEOFENCE İHLAL KONTROLÜ
             if (vehicle.geofenceBreach) {
                 if (!notifiedGeofenceVehicles.contains(vehicle.vehicleId)) {
                     sendPushNotification(
@@ -165,26 +161,21 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun sendPushNotification(title: String, message: String, notificationId: Int) {
         val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        // MainActivity'de kurduğumuz kanal ID'si ile aynı olmalı
         val channelId = "telemetry_alerts_channel"
-
         val notification = NotificationCompat.Builder(appContext, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_background) // Projende ic_warning yoksa, ic_launcher veya elindeki bir iconu yaz
+            .setSmallIcon(R.drawable.ic_launcher_background)
             .setContentTitle(title)
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .build()
-
         notificationManager.notify(notificationId, notification)
     }
 
     fun selectVehicle(vehicleId: String) {
         selectedVehicleId = vehicleId
         _detailState.value = VehicleDetailState()
-
         viewModelScope.launch {
             val history = socketService.getTelemetryHistory(vehicleId)
             currentRouteHistory = history.reversed()
@@ -206,7 +197,6 @@ class TelemetryViewModel(application: Application) : AndroidViewModel(applicatio
                     "value": "$mode"
                 }
             """.trimIndent()
-
             socketService.sendCommand(commandJson)
         }
     }

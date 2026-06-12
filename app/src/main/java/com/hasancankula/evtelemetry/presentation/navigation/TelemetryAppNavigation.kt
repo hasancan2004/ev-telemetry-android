@@ -5,16 +5,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+
 import com.hasancankula.evtelemetry.presentation.Screen
 import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
+import com.hasancankula.evtelemetry.presentation.analytics.AnalyticsScreen
 import com.hasancankula.evtelemetry.presentation.detail.VehicleDetailScreen
 import com.hasancankula.evtelemetry.presentation.fleet.FleetDashboardScreen
 import com.hasancankula.evtelemetry.presentation.geofence.GeofenceMapScreen
@@ -24,25 +28,25 @@ import com.hasancankula.evtelemetry.presentation.settings.SettingsScreen
 @Composable
 fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
     val navController = rememberNavController()
-    val items = listOf(Screen.Fleet, Screen.Geofence, Screen.Settings)
+
+    // YENİ: Alt menüye Screen.Analytics'i ekledik!
+    // (Bunun çalışması için Screen.kt içine object Analytics satırını eklemeyi unutma)
+    val items = listOf(Screen.Fleet, Screen.Analytics, Screen.Geofence, Screen.Settings)
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Kurumsal Tema Rengimiz (Tüm ekranlarda sabit lacivert)
     val brandColor = Color(0xFF4A5D8A)
-
-    // Detay ekranındayken ana TopBar ve BottomBar'ı gizlemek için kontrol
     val isDetailScreen = currentRoute?.startsWith("vehicle_detail") == true
 
     Scaffold(
         topBar = {
             if (!isDetailScreen) {
-                // Dinamik başlık belirleme mantığı
                 val titleText = when (currentRoute) {
                     Screen.Fleet.route -> "Filo Kontrol Merkezi"
                     Screen.Geofence.route -> "Güvenlik Bölgeleri"
                     Screen.Settings.route -> "Filo Kontrol Ayarları"
+                    Screen.Analytics.route -> "Filo Performans Raporları" // YENİ
                     else -> "Filo Kontrol Merkezi"
                 }
 
@@ -109,6 +113,16 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                         navController.navigate("vehicle_detail/$vehicleId")
                     }
                 )
+            }
+            // YENİ: Analiz ekranı yönlendirmesi
+            composable(Screen.Analytics.route) {
+                // Ekran açıldığında verileri yenile (pull-to-refresh mantığı)
+                LaunchedEffect(Unit) {
+                    viewModel.fetchAnalytics()
+                }
+
+                val analyticsData by viewModel.analyticsData.collectAsStateWithLifecycle()
+                AnalyticsScreen(analyticsData = analyticsData)
             }
             composable(Screen.Geofence.route) {
                 GeofenceMapScreen(viewModel = viewModel)
