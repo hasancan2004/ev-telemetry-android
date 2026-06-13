@@ -18,7 +18,9 @@ import com.hasancankula.evtelemetry.presentation.TelemetryForegroundService
 import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
 import com.hasancankula.evtelemetry.presentation.navigation.TelemetryAppNavigation
 import com.hasancankula.evtelemetry.ui.theme.EVTelemetryTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel : TelemetryViewModel by viewModels()
 

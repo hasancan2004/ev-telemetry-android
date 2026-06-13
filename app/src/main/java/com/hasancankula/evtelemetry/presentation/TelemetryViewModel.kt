@@ -14,6 +14,7 @@ import com.hasancankula.evtelemetry.data.SettingsDataStore
 import com.hasancankula.evtelemetry.data.TelemetryHistoryDto
 import com.hasancankula.evtelemetry.data.TelemetrySocketService
 import com.hasancankula.evtelemetry.domain.SmartRangeCalculator
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 sealed class FleetUiState {
     data object Loading : FleetUiState()
@@ -34,13 +36,18 @@ data class VehicleDetailState(
     val routeHistory: List<TelemetryHistoryDto> = emptyList()
 )
 
-class TelemetryViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class TelemetryViewModel @Inject constructor(
+    application: Application,
+    private val socketService: TelemetrySocketService
+
+) : AndroidViewModel(application) {
 
     private val appContext = application.applicationContext
     private val _chargingStations = MutableStateFlow<List<ChargingStationDto>>(emptyList())
     val chargingStations: StateFlow<List<ChargingStationDto>> = _chargingStations.asStateFlow()
     private val settingsDataStore = SettingsDataStore(application)
-    private val socketService = TelemetrySocketService()
+
     private val rangeCalculator = SmartRangeCalculator()
 
     private val notifiedRiskVehicles = mutableSetOf<String>()

@@ -1,6 +1,6 @@
 package com.hasancankula.evtelemetry.chat.data
 
-import androidx.compose.ui.autofill.ContentType
+
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.post
