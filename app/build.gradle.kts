@@ -98,4 +98,10 @@ dependencies {
 
     // Jetpack DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+    // Room Database (Çevrimdışı Hafıza)
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
 }

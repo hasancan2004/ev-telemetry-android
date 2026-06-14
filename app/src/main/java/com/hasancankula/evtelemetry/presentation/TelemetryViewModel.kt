@@ -13,6 +13,8 @@ import com.hasancankula.evtelemetry.data.EVTelemetryDto
 import com.hasancankula.evtelemetry.data.SettingsDataStore
 import com.hasancankula.evtelemetry.data.TelemetryHistoryDto
 import com.hasancankula.evtelemetry.data.TelemetrySocketService
+import com.hasancankula.evtelemetry.data.local.TelemetryDao
+import com.hasancankula.evtelemetry.data.local.TelemetryEntity
 import com.hasancankula.evtelemetry.domain.SmartRangeCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,8 +41,8 @@ data class VehicleDetailState(
 @HiltViewModel
 class TelemetryViewModel @Inject constructor(
     application: Application,
-    private val socketService: TelemetrySocketService
-
+    private val socketService: TelemetrySocketService,
+    private val telemetryDao: TelemetryDao
 ) : AndroidViewModel(application) {
 
     private val appContext = application.applicationContext
@@ -53,7 +55,6 @@ class TelemetryViewModel @Inject constructor(
     private val notifiedRiskVehicles = mutableSetOf<String>()
     private val notifiedGeofenceVehicles = mutableSetOf<String>()
 
-    // YENİ: Analiz verilerini tutacak StateFlow
     private val _analyticsData = MutableStateFlow<AnalyticsKpiDto?>(null)
     val analyticsData: StateFlow<AnalyticsKpiDto?> = _analyticsData.asStateFlow()
 
@@ -83,7 +84,7 @@ class TelemetryViewModel @Inject constructor(
     init {
         startFleetStream()
         loadChargingStations()
-        fetchAnalytics() // Başlangıçta analizleri de yükle
+        fetchAnalytics()
     }
 
     private fun loadChargingStations() {
@@ -93,7 +94,6 @@ class TelemetryViewModel @Inject constructor(
         }
     }
 
-    // YENİ: Python'dan Analizleri Çek
     fun fetchAnalytics() {
         viewModelScope.launch {
             val data = socketService.getAnalytics()
@@ -105,11 +105,51 @@ class TelemetryViewModel @Inject constructor(
         viewModelScope.launch {
             socketService.getTelemetryStream()
                 .catch { exception ->
-                    _uiState.value = FleetUiState.Error(exception.message ?: "Bağlantı koptu.")
+                    telemetryDao.getAllTelemetriesFlow().collect { localData ->
+                        if (localData.isNotEmpty()) {
+                            // TİP UYUŞMAZLIĞI ÇÖZÜMÜ: toDouble() eklendi
+                            val fallbackList = localData.map { entity ->
+                                EVTelemetryDto(
+                                    vehicleId = entity.vehicleId,
+                                    vehicleModel = entity.vehicleModel,
+                                    speedKmh = entity.speedKmh,
+                                    batteryLevelPct = entity.batteryLevelPct.toDouble(),
+                                    latitude = entity.latitude,
+                                    longitude = entity.longitude,
+                                    maintenanceRiskPct = entity.maintenanceRiskPct.toDouble(),
+                                    ecoScore = entity.ecoScore,
+                                    regenerationKw = 0.0,
+                                    cabinTemperatureC = 22.0,
+                                    suspensionMode = "Bilinmiyor",
+                                    tirePressurePsi = 33.0,
+                                    estimatedRangeKm = 0,
+                                    geofenceBreach = false
+                                )
+                            }
+                            _uiState.value = FleetUiState.Success(fallbackList)
+                        } else {
+                            _uiState.value = FleetUiState.Error("İnternet yok ve önbellekte veri bulunamadı.")
+                        }
+                    }
                 }
                 .collect { fleetList ->
                     _uiState.value = FleetUiState.Success(fleetList)
                     checkAndTriggerNotifications(fleetList)
+
+                    // TİP UYUŞMAZLIĞI ÇÖZÜMÜ: toFloat() eklendi
+                    val entities = fleetList.map { dto ->
+                        TelemetryEntity(
+                            vehicleId = dto.vehicleId,
+                            vehicleModel = dto.vehicleModel,
+                            speedKmh = dto.speedKmh,
+                            batteryLevelPct = dto.batteryLevelPct.toFloat(),
+                            latitude = dto.latitude,
+                            longitude = dto.longitude,
+                            maintenanceRiskPct = dto.maintenanceRiskPct.toFloat(),
+                            ecoScore = dto.ecoScore
+                        )
+                    }
+                    telemetryDao.insertTelemetries(entities)
 
                     selectedVehicleId?.let { id ->
                         val activeVehicle = fleetList.find { it.vehicleId == id }
