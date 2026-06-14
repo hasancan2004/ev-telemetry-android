@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -11,13 +12,39 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
 
-@OptIn
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: TelemetryViewModel) {
     val aiThreshold by viewModel.aiAlarmThreshold.collectAsStateWithLifecycle()
     val geofenceRadius by viewModel.geofenceRadiusKm.collectAsStateWithLifecycle()
+    // YENİ: ViewModel'den karanlık mod durumunu dinliyoruz
+    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+
+        // YENİ: Görünüm (Tema) Ayarı Kartı
+        Text(text = "Görünüm", style = MaterialTheme.typography.titleLarge, color = Color(0xFF4A5D8A), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Karanlık Mod", fontWeight = FontWeight.Bold)
+                    Text(text = "Uygulama temasını gece moduna geçirir.", style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(
+                    checked = isDarkMode,
+                    onCheckedChange = { viewModel.updateDarkMode(it) },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF4A5D8A))
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(text = "Bildirim Hassasiyeti", style = MaterialTheme.typography.titleLarge, color = Color(0xFF4A5D8A), fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -31,7 +58,9 @@ fun SettingsScreen(viewModel: TelemetryViewModel) {
                 Slider(value = aiThreshold, onValueChange = { viewModel.updateAiThreshold(it) }, valueRange = 50f..95f, steps = 8)
             }
         }
+
         Spacer(modifier = Modifier.height(24.dp))
+
         Text(text = "Coğrafi Sınır (Geofencing)", style = MaterialTheme.typography.titleLarge, color = Color(0xFF4A5D8A), fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {

@@ -64,12 +64,21 @@ class TelemetryViewModel @Inject constructor(
     val geofenceRadiusKm: StateFlow<Float> = settingsDataStore.geofenceRadiusFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 20f)
 
+    // YENİ: SettingsScreen'in aradığı Karanlık Mod dinleyicisi
+    val isDarkMode: StateFlow<Boolean> = settingsDataStore.isDarkModeFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     fun updateAiThreshold(newValue: Float) {
         viewModelScope.launch { settingsDataStore.saveAiThreshold(newValue) }
     }
 
     fun updateGeofenceRadius(newValue: Float) {
         viewModelScope.launch { settingsDataStore.saveGeofenceRadius(newValue) }
+    }
+
+    // YENİ: SettingsScreen'in aradığı Karanlık Mod güncelleme fonksiyonu
+    fun updateDarkMode(isDark: Boolean) {
+        viewModelScope.launch { settingsDataStore.saveDarkMode(isDark) }
     }
 
     private val _uiState = MutableStateFlow<FleetUiState>(FleetUiState.Loading)
@@ -107,7 +116,6 @@ class TelemetryViewModel @Inject constructor(
                 .catch { exception ->
                     telemetryDao.getAllTelemetriesFlow().collect { localData ->
                         if (localData.isNotEmpty()) {
-                            // TİP UYUŞMAZLIĞI ÇÖZÜMÜ: toDouble() eklendi
                             val fallbackList = localData.map { entity ->
                                 EVTelemetryDto(
                                     vehicleId = entity.vehicleId,
@@ -136,7 +144,6 @@ class TelemetryViewModel @Inject constructor(
                     _uiState.value = FleetUiState.Success(fleetList)
                     checkAndTriggerNotifications(fleetList)
 
-                    // TİP UYUŞMAZLIĞI ÇÖZÜMÜ: toFloat() eklendi
                     val entities = fleetList.map { dto ->
                         TelemetryEntity(
                             vehicleId = dto.vehicleId,

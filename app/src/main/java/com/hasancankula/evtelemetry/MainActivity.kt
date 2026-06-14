@@ -12,7 +12,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 import com.hasancankula.evtelemetry.presentation.TelemetryForegroundService
 import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
@@ -24,12 +26,11 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val viewModel : TelemetryViewModel by viewModels()
 
-    // Android 13+ için bildirim izni penceresi motoru
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            startTelemetryService() // İzin verildiyse nöbetçiyi başlat
+            startTelemetryService()
         }
     }
 
@@ -37,25 +38,28 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         createNotificationChannel()
-        checkPermissionsAndStartService() // YENİ: İzinleri kontrol et ve servisi başlat
+        checkPermissionsAndStartService()
 
         setContent {
-            EVTelemetryTheme {
+            // YENİ: Ayarlardaki karanlık mod şalterinin durumunu dinliyoruz
+            val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
+
+            // YENİ: Dinlediğimiz bu durumu ana temaya "darkTheme" olarak veriyoruz
+            EVTelemetryTheme(darkTheme = isDarkMode) {
                 TelemetryAppNavigation(viewModel = viewModel)
             }
         }
     }
 
     private fun checkPermissionsAndStartService() {
-        // Android 13 ve üstü ise bildirim izni iste
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             } else {
-                startTelemetryService() // Zaten izin varsa direkt başlat
+                startTelemetryService()
             }
         } else {
-            startTelemetryService() // Android 12 ve altı ise direkt başlat
+            startTelemetryService()
         }
     }
 

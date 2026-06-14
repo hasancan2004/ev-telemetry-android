@@ -1,5 +1,7 @@
 package com.hasancankula.evtelemetry.presentation.navigation
 
+// YENİ: Karanlık modu dinlemek için gereken import eklendi
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -30,16 +32,19 @@ import com.hasancankula.evtelemetry.presentation.settings.SettingsScreen
 fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
     val navController = rememberNavController()
 
-    // YENİ: Alt menüye Screen.Chat'i de ekledik
     val items = listOf(Screen.Fleet, Screen.Analytics, Screen.Chat, Screen.Geofence, Screen.Settings)
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val brandColor = Color(0xFF4A5D8A)
+    // YENİ: Sistemin karanlık modda olup olmadığını dinleyen sihirli satır
+    val isDarkTheme by viewModel.isDarkMode.collectAsStateWithLifecycle()
 
-    // Hem araç detayı hem de asistan ekranında alt menüyü gizlemek istersen isDetailScreen şartını genişletebilirsin.
-    // Şimdilik sadece vehicle_detail'da gizliyoruz, asistanda alt menü kalıyor.
+    // YENİ: Marka rengimizi temaya göre dinamikleştiriyoruz (Karanlıkta daha pastel, aydınlıkta tok lacivert)
+    val brandColor = if (isDarkTheme) Color(0xFF7B8DBC) else Color(0xFF4A5D8A)
+    // YENİ: Seçili olmayan ikonlar karanlıkta çok boğulmasın diye
+    val unselectedIconColor = if (isDarkTheme) Color.LightGray else Color.Gray
+
     val isDetailScreen = currentRoute?.startsWith("vehicle_detail") == true
 
     Scaffold(
@@ -50,15 +55,16 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                     Screen.Geofence.route -> "Güvenlik Bölgeleri"
                     Screen.Settings.route -> "Filo Kontrol Ayarları"
                     Screen.Analytics.route -> "Filo Performans Raporları"
-                    Screen.Chat.route -> "Yapay Zeka Asistanı" // YENİ
+                    Screen.Chat.route -> "Yapay Zeka Asistanı"
                     else -> "Filo Kontrol Merkezi"
                 }
 
                 CenterAlignedTopAppBar(
                     title = { Text(text = titleText, fontWeight = FontWeight.Bold) },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = brandColor,
-                        titleContentColor = Color.White
+                        // YENİ: Üst bar karanlık moda geçerse sistemin koyu rengini alır
+                        containerColor = if (isDarkTheme) MaterialTheme.colorScheme.surfaceVariant else brandColor,
+                        titleContentColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
                     )
                 )
             }
@@ -66,7 +72,8 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
         bottomBar = {
             if (!isDetailScreen) {
                 NavigationBar(
-                    containerColor = Color.White,
+                    // YENİ: Alt barı doğrudan temanın yüzey rengine bağladık. Üst bar ile kusursuz senkronize olur.
+                    containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 8.dp
                 ) {
                     items.forEach { screen ->
@@ -76,17 +83,21 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                                 Icon(
                                     screen.icon,
                                     contentDescription = screen.title,
-                                    tint = if (isSelected) brandColor else Color.Gray
+                                    tint = if (isSelected) brandColor else unselectedIconColor
                                 )
                             },
                             label = {
                                 Text(
                                     screen.title,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) brandColor else Color.Gray
+                                    color = if (isSelected) brandColor else unselectedIconColor
                                 )
                             },
                             selected = isSelected,
+                            // YENİ: Seçili ikonun arkasındaki yuvarlak arka planı daha estetik yaptık
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = if (isDarkTheme) brandColor.copy(alpha = 0.2f) else brandColor.copy(alpha = 0.1f)
+                            ),
                             onClick = {
                                 if (currentRoute != screen.route) {
                                     navController.navigate(screen.route) {
@@ -125,7 +136,6 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                 val analyticsData by viewModel.analyticsData.collectAsStateWithLifecycle()
                 AnalyticsScreen(analyticsData = analyticsData)
             }
-            // YENİ: Asistan ekranı yönlendirmesi
             composable(Screen.Chat.route) {
                 ChatScreen()
             }

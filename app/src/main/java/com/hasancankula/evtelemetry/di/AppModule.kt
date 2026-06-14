@@ -2,7 +2,7 @@ package com.hasancankula.evtelemetry.di
 
 import android.content.Context
 import androidx.room.Room
-import com.hasancankula.evtelemetry.data.TelemetryDao
+import com.hasancankula.evtelemetry.data.local.TelemetryDao
 import com.hasancankula.evtelemetry.data.TelemetrySocketService
 import com.hasancankula.evtelemetry.data.local.AppDatabase
 import dagger.Module

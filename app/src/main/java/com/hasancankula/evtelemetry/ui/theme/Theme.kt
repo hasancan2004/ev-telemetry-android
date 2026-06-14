@@ -9,35 +9,36 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = BrandPrimaryDark,
+    secondary = BrandSecondaryDark,
+    background = BrandBackgroundDark,
+    surface = BrandSurfaceDark,
+    surfaceVariant = Color(0xFF2D2D2D), // Gece modunda kartların arkaplanı
+    onPrimary = Color.Black, // Buton içi yazılar
+    onBackground = Color.White,
+    onSurface = Color.White
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = BrandPrimaryLight,
+    secondary = BrandSecondaryLight,
+    background = BrandBackgroundLight,
+    surface = BrandSurfaceLight,
+    surfaceVariant = Color(0xFFE9EDF5), // Gündüz modunda kartlar için tatlı bir açık mavi/gri
     onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
     onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    onSurface = Color(0xFF1C1B1F)
 )
 
 @Composable
 fun EVTelemetryTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // YENİ: Dinamik rengi varsayılan olarak false yaptık. Artık marka renklerimiz patlayacak!
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
