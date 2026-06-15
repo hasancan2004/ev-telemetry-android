@@ -64,7 +64,6 @@ class TelemetryViewModel @Inject constructor(
     val geofenceRadiusKm: StateFlow<Float> = settingsDataStore.geofenceRadiusFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 20f)
 
-    // YENİ: SettingsScreen'in aradığı Karanlık Mod dinleyicisi
     val isDarkMode: StateFlow<Boolean> = settingsDataStore.isDarkModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
@@ -76,7 +75,6 @@ class TelemetryViewModel @Inject constructor(
         viewModelScope.launch { settingsDataStore.saveGeofenceRadius(newValue) }
     }
 
-    // YENİ: SettingsScreen'in aradığı Karanlık Mod güncelleme fonksiyonu
     fun updateDarkMode(isDark: Boolean) {
         viewModelScope.launch { settingsDataStore.saveDarkMode(isDark) }
     }
@@ -261,6 +259,18 @@ class TelemetryViewModel @Inject constructor(
             if (success) {
                 loadChargingStations()
             }
+        }
+    }
+
+    // YENİ: Patron Modu - Tüm Filonun Şarjını Sıfırla
+    fun resetFleetBatteries() {
+        viewModelScope.launch {
+            val commandJson = """
+                {
+                    "action": "reset_battery"
+                }
+            """.trimIndent()
+            socketService.sendCommand(commandJson)
         }
     }
 

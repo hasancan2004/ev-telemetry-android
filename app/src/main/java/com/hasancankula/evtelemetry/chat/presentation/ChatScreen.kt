@@ -14,11 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
+// YENİ: hiltViewModel() kullanıldı
+fun ChatScreen(viewModel: ChatViewModel = hiltViewModel()) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     var inputText by remember { mutableStateOf("") }
@@ -28,7 +30,7 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
             TopAppBar(
                 title = { Text("Yapay Zeka Filo Asistanı", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF4A5D8A),
+                    containerColor = MaterialTheme.colorScheme.primary, // Temaya bağlandı
                     titleContentColor = Color.White
                 )
             )
@@ -40,7 +42,6 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            // Mesajlar Listesi
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -52,17 +53,15 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
                     ChatBubble(msg)
                 }
 
-                // Asistan yazıyor animasyonu
                 if (isLoading) {
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.CenterStart) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF4A5D8A))
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
             }
 
-            // Alt Mesaj Yazma Alanı
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -77,7 +76,7 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
                     placeholder = { Text("Asistana sor...") },
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF4A5D8A)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
                     )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -88,7 +87,7 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
                             inputText = ""
                         }
                     },
-                    containerColor = Color(0xFF4A5D8A),
+                    containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.White,
                     modifier = Modifier.size(50.dp)
                 ) {
@@ -102,8 +101,8 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
 @Composable
 fun ChatBubble(message: ChatMessage) {
     val isUser = message.isUser
-    val bgColor = if (isUser) Color(0xFF4A5D8A) else Color.White
-    val textColor = if (isUser) Color.White else Color.Black
+    val bgColor = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val textColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
 
     Box(

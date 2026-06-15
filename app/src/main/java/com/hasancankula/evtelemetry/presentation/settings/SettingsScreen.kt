@@ -17,12 +17,10 @@ import com.hasancankula.evtelemetry.presentation.TelemetryViewModel
 fun SettingsScreen(viewModel: TelemetryViewModel) {
     val aiThreshold by viewModel.aiAlarmThreshold.collectAsStateWithLifecycle()
     val geofenceRadius by viewModel.geofenceRadiusKm.collectAsStateWithLifecycle()
-    // YENİ: ViewModel'den karanlık mod durumunu dinliyoruz
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
 
-        // YENİ: Görünüm (Tema) Ayarı Kartı
         Text(text = "Görünüm", style = MaterialTheme.typography.titleLarge, color = Color(0xFF4A5D8A), fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
@@ -72,6 +70,33 @@ fun SettingsScreen(viewModel: TelemetryViewModel) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = "Araçlar Konya merkezinden bu mesafe kadar uzaklaştığında sınır ihlali sayılır.", style = MaterialTheme.typography.bodySmall)
                 Slider(value = geofenceRadius, onValueChange = { viewModel.updateGeofenceRadius(it) }, valueRange = 5f..100f, steps = 18)
+            }
+        }
+
+        // YENİ: Sistem Kontrolü (Patron Modu) Kartı
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(text = "Sistem Kontrolü (Patron Modu)", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Tüm Filonun Şarjını Sıfırla", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Simülasyondaki tüm araçların bataryasını anında %100 yapar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                    Button(
+                        onClick = { viewModel.resetFleetBatteries() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)
+                    ) {
+                        Text("Sıfırla")
+                    }
+                }
             }
         }
     }
