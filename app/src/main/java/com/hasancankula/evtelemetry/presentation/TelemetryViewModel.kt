@@ -166,9 +166,10 @@ class TelemetryViewModel @Inject constructor(
                                 longitude = vehicle.longitude,
                                 speedKmh = vehicle.speedKmh
                             )
-                            if (currentRouteHistory.isEmpty() || currentRouteHistory.last().latitude != vehicle.latitude) {
-                                currentRouteHistory = currentRouteHistory + currentPoint
-                            }
+
+                            // YENİ: Hata düzeldi. Simülasyonda konum değişmese bile hız grafiği için veriyi ekle, ama son 100 veride tut.
+                            currentRouteHistory = (currentRouteHistory + currentPoint).takeLast(100)
+
                             _detailState.value = VehicleDetailState(
                                 telemetry = vehicle,
                                 estimatedRange = dynamicRange,
@@ -262,7 +263,6 @@ class TelemetryViewModel @Inject constructor(
         }
     }
 
-    // YENİ: Patron Modu - Tüm Filonun Şarjını Sıfırla
     fun resetFleetBatteries() {
         viewModelScope.launch {
             val commandJson = """

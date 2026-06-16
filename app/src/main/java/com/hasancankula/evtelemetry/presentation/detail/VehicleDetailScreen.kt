@@ -265,16 +265,33 @@ fun TelemetryCard(title: String, value: String, valueStyle: androidx.compose.ui.
 
 @Composable
 fun SpeedAnalyticsCard(routeHistory: List<TelemetryHistoryDto>) {
-    val chartEntries = routeHistory.mapIndexed { index, dto -> FloatEntry(x = index.toFloat(), y = dto.speedKmh.toFloat()) }
-    Card(modifier = Modifier.fillMaxWidth().height(250.dp).padding(horizontal = 16.dp), shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(defaultElevation = 6.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    // YENİ: X eksenindeki (index) değerleri her saniye artan ardışık Float'lara çevirdik
+    val chartEntries = routeHistory.mapIndexed { index, dto ->
+        FloatEntry(x = index.toFloat(), y = dto.speedKmh.toFloat())
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().height(250.dp).padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(text = "Hız Analizi (Son 100 Veri)", style = MaterialTheme.typography.titleMedium, color = Color(0xFF4A5D8A), fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
             if (chartEntries.size > 1) {
                 val chartEntryModel = entryModelOf(chartEntries)
-                Chart(chart = lineChart(), model = chartEntryModel, startAxis = rememberStartAxis(title = "Hız (km/h)"), bottomAxis = rememberBottomAxis(), modifier = Modifier.fillMaxSize())
+                Chart(
+                    chart = lineChart(),
+                    model = chartEntryModel,
+                    startAxis = rememberStartAxis(title = "Hız (km/h)"),
+                    bottomAxis = rememberBottomAxis(),
+                    modifier = Modifier.fillMaxSize()
+                )
             } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Grafik için veri toplanıyor...", style = MaterialTheme.typography.bodyMedium) }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Grafik için veri toplanıyor...", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
