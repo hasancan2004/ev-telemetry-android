@@ -8,8 +8,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
 
 data class ChatMessage(val text: String, val isUser: Boolean)
 
@@ -36,23 +38,25 @@ class ChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // 1. Veritabanından (Room) araçların son durumunu çekiyoruz
+                // YENİ: .collect yerine .first() kullanıyoruz!
+                // Böylece sadece o anki veriyi 1 kere alıp veritabanını dinlemeyi bırakıyor.
+                val localData = telemetryDao.getAllTelemetriesFlow().first()
+
                 var fleetContextText = "Filoda kayıtlı araç verisi bulunamadı."
-                telemetryDao.getAllTelemetriesFlow().collect { localData ->
-                    if (localData.isNotEmpty()) {
-                        val stringBuilder = java.lang.StringBuilder()
-                        localData.forEach {
-                            stringBuilder.append("- Araç ${it.vehicleId} (${it.vehicleModel}): Hız ${it.speedKmh} km/s, Batarya %${it.batteryLevelPct}, Arıza Riski %${it.maintenanceRiskPct}\n")
-                        }
-                        fleetContextText = stringBuilder.toString()
+                if (localData.isNotEmpty()) {
+                    val stringBuilder = java.lang.StringBuilder()
+                    localData.forEach {
+                        stringBuilder.append("- Araç ${it.vehicleId} (${it.vehicleModel}): Hız ${it.speedKmh} km/s, Batarya %${it.batteryLevelPct}, Arıza Riski %${it.maintenanceRiskPct}\n")
                     }
-
-                    // 2. Kullanıcı mesajı ve filo durumuyla Gemini'ye soruyoruz
-                    val reply = geminiService.getAiResponse(userMessage, fleetContextText)
-
-                    _messages.value = _messages.value + ChatMessage(reply, false)
-                    _isLoading.value = false
+                    fleetContextText = stringBuilder.toString()
                 }
+
+                // 2. Kullanıcı mesajı ve filo durumuyla Gemini'ye soruyoruz
+                val reply = geminiService.getAiResponse(userMessage, fleetContextText)
+
+                _messages.value = _messages.value + ChatMessage(reply, false)
+                _isLoading.value = false
+
             } catch (e: Exception) {
                 _messages.value = _messages.value + ChatMessage("Bağlantı hatası: ${e.localizedMessage}", false)
                 _isLoading.value = false

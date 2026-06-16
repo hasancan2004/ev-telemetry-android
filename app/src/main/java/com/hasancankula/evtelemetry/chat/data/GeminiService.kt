@@ -12,7 +12,7 @@ class GeminiService @Inject constructor() {
 
     // Google'ın en hızlı ve verimli modeli olan gemini-1.5-flash'ı güvenli API anahtarımızla başlatıyoruz
     private val generativeModel = GenerativeModel(
-        modelName = "gemini-1.5-flash",
+        modelName = "gemini-2.5-flash",
         apiKey = BuildConfig.GEMINI_API_KEY
     )
 
