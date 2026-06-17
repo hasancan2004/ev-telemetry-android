@@ -1,13 +1,11 @@
 package com.hasancankula.evtelemetry.presentation.navigation
 
-// YENİ: Karanlık modu dinlemek için gereken import eklendi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,12 +35,9 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // YENİ: Sistemin karanlık modda olup olmadığını dinleyen sihirli satır
     val isDarkTheme by viewModel.isDarkMode.collectAsStateWithLifecycle()
 
-    // YENİ: Marka rengimizi temaya göre dinamikleştiriyoruz (Karanlıkta daha pastel, aydınlıkta tok lacivert)
     val brandColor = if (isDarkTheme) Color(0xFF7B8DBC) else Color(0xFF4A5D8A)
-    // YENİ: Seçili olmayan ikonlar karanlıkta çok boğulmasın diye
     val unselectedIconColor = if (isDarkTheme) Color.LightGray else Color.Gray
 
     val isDetailScreen = currentRoute?.startsWith("vehicle_detail") == true
@@ -62,7 +57,6 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                 CenterAlignedTopAppBar(
                     title = { Text(text = titleText, fontWeight = FontWeight.Bold) },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        // YENİ: Üst bar karanlık moda geçerse sistemin koyu rengini alır
                         containerColor = if (isDarkTheme) MaterialTheme.colorScheme.surfaceVariant else brandColor,
                         titleContentColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
                     )
@@ -72,7 +66,6 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
         bottomBar = {
             if (!isDetailScreen) {
                 NavigationBar(
-                    // YENİ: Alt barı doğrudan temanın yüzey rengine bağladık. Üst bar ile kusursuz senkronize olur.
                     containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 8.dp
                 ) {
@@ -94,7 +87,6 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                                 )
                             },
                             selected = isSelected,
-                            // YENİ: Seçili ikonun arkasındaki yuvarlak arka planı daha estetik yaptık
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor = if (isDarkTheme) brandColor.copy(alpha = 0.2f) else brandColor.copy(alpha = 0.1f)
                             ),
@@ -130,11 +122,7 @@ fun TelemetryAppNavigation(viewModel: TelemetryViewModel) {
                 )
             }
             composable(Screen.Analytics.route) {
-                LaunchedEffect(Unit) {
-                    viewModel.fetchAnalytics()
-                }
-                val analyticsData by viewModel.analyticsData.collectAsStateWithLifecycle()
-                AnalyticsScreen(analyticsData = analyticsData)
+                AnalyticsScreen(viewModel = viewModel)
             }
             composable(Screen.Chat.route) {
                 ChatScreen()

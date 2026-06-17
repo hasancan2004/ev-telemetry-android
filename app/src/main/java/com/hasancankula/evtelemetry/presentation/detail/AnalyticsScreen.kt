@@ -6,12 +6,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect // YENİ EKLENDİ
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle // YENİ EKLENDİ
 import com.hasancankula.evtelemetry.data.AnalyticsKpiDto
+import com.hasancankula.evtelemetry.presentation.TelemetryViewModel // YENİ EKLENDİ
 import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
 import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
 import com.patrykandpatrick.vico.compose.chart.Chart
@@ -20,7 +24,17 @@ import com.patrykandpatrick.vico.core.entry.entryModelOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnalyticsScreen(analyticsData: AnalyticsKpiDto?) {
+// YENİ: Doğrudan ViewModel'i alıyoruz ki ekran her açıldığında veri çekebilelim
+fun AnalyticsScreen(viewModel: TelemetryViewModel) {
+
+    // YENİ: Veriyi state olarak dinliyoruz
+    val analyticsData by viewModel.analyticsData.collectAsStateWithLifecycle()
+
+    // YENİ: Ekran her açıldığında (Composition başladığında) verileri API'den tazelemek için tetikliyoruz
+    LaunchedEffect(key1 = true) {
+        viewModel.fetchAnalytics()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -62,13 +76,13 @@ fun AnalyticsScreen(analyticsData: AnalyticsKpiDto?) {
                         KpiCard(
                             modifier = Modifier.weight(1f),
                             title = "Toplam Tüketim",
-                            value = "${analyticsData.total_energy_kwh} kWh",
+                            value = "${analyticsData?.total_energy_kwh ?: 0.0} kWh",
                             color = Color(0xFF2196F3)
                         )
                         KpiCard(
                             modifier = Modifier.weight(1f),
                             title = "Kritik Riskli Araç",
-                            value = "${analyticsData.critical_risk_count}",
+                            value = "${analyticsData?.critical_risk_count ?: 0}",
                             color = Color(0xFFF44336)
                         )
                     }
@@ -76,8 +90,8 @@ fun AnalyticsScreen(analyticsData: AnalyticsKpiDto?) {
                     KpiCard(
                         modifier = Modifier.fillMaxWidth(),
                         title = "Filo Ortalama Eco-Score",
-                        value = "${analyticsData.avg_eco_score} / 100",
-                        color = if (analyticsData.avg_eco_score >= 80) Color(0xFF4CAF50) else Color(0xFFFF9800)
+                        value = "${analyticsData?.avg_eco_score ?: 0} / 100",
+                        color = if ((analyticsData?.avg_eco_score ?: 0) >= 80) Color(0xFF4CAF50) else Color(0xFFFF9800)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -118,7 +132,6 @@ fun KpiCard(modifier: Modifier = Modifier, title: String, value: String, color: 
 
 @Composable
 fun TrendChartCard() {
-    // ÇÖZÜM: FloatEntry yerine doğrudan Kotlin Pair (to) yapısını kullandık
     val chartEntryModel = entryModelOf(
         1f to 120f,
         2f to 150f,
